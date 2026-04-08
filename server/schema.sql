@@ -1,6 +1,3 @@
-DROP TABLE IF EXISTS nonprofits;
-DROP TABLE IF EXISTS approved_organizations;
-
 CREATE TABLE IF NOT EXISTS attempts (
   id TEXT PRIMARY KEY,
   createdAt TEXT,
@@ -9,8 +6,6 @@ CREATE TABLE IF NOT EXISTS attempts (
   responses TEXT,
   result TEXT
 );
-
-DROP TABLE IF EXISTS applications;
 
 CREATE TABLE IF NOT EXISTS nonprofits (
   id TEXT PRIMARY KEY,

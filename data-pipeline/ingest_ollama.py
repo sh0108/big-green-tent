@@ -63,7 +63,7 @@ def main():
     insert_sql = '''INSERT INTO nonprofits (id, name, mission, sector, maturity, program_efficiency, revenue_growth, sustainability, scale, grant_distribution, geographic_reach, innovation_output, location, enrichment_summary) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'''
     
     success_count = 0
-    for org in organizations[:10]:
+    for org in organizations[:50]:
         try:
             name = org.get('name')
             if not name: continue
