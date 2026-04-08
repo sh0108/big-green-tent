@@ -1,3 +1,6 @@
+DROP TABLE IF EXISTS nonprofits;
+DROP TABLE IF EXISTS approved_organizations;
+
 CREATE TABLE IF NOT EXISTS attempts (
   id TEXT PRIMARY KEY,
   createdAt TEXT,

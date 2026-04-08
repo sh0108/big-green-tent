@@ -318,6 +318,11 @@ export default function DiscoveryPage() {
                         <div className="md:w-2/3">
                           <h4 className="font-bold text-lg text-green-950 group-hover:text-green-700 transition">{org.name}</h4>
                           <p className="text-sm text-green-700 line-clamp-1 mt-1">{org.mission}</p>
+                          {org.enrichment_summary && (
+                            <p className="text-sm text-emerald-700 italic mt-2 border-l-2 border-emerald-400 pl-2">
+                              <span className="font-bold text-emerald-600">✨ AI Insight:</span> {org.enrichment_summary}
+                            </p>
+                          )}
                         </div>
                         <div className="flex-shrink-0 flex flex-col md:items-end justify-center gap-1">
                           <span className="text-xs font-bold text-green-600 uppercase tracking-wider mb-1">Match Score</span>
@@ -359,6 +364,11 @@ export default function DiscoveryPage() {
                         <div>
                           <h4 className="font-bold text-2xl text-green-950">{org.name}</h4>
                           <p className="text-sm text-green-700 mt-1 uppercase tracking-wider font-semibold">{org.sector}</p>
+                          {org.enrichment_summary && (
+                            <p className="text-sm text-emerald-700 italic mt-2 border-l-2 border-emerald-400 pl-2">
+                              <span className="font-bold text-emerald-600">✨ AI Insight:</span> {org.enrichment_summary}
+                            </p>
+                          )}
                         </div>
                         <button 
                           onClick={(e) => handleRemove(org.nonprofit_id, e)}

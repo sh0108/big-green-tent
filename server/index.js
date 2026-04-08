@@ -11,14 +11,14 @@ import { getDb } from './db.js'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 import { computeScore } from './scoring.js'
-import { seedIfEmpty } from './seed.js'
+// import { seedIfEmpty } from './seed.js'
 import OpenAI from 'openai'
 
 const envPath = path.resolve(process.cwd(), '.env')
 dotenv.config({ path: envPath })
 
 // Seed DB with mock data if empty
-seedIfEmpty(getDb())
+// seedIfEmpty(getDb())
 
 const apiKey = process.env.OPENAI_QUIZ_API_KEY
 if (!apiKey) {

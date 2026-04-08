@@ -30,6 +30,7 @@ export function computeScore(weights, nonprofit) {
     (nonprofit.innovation_output || 0) * finalInn
   ) / totalWeight;
 
-  // Convert 0-1 metrics to a 0-100 score
-  return Math.round(score * 100);
+  // Convert 0-2 metrics to a 0-100 score
+  const calculatedScore = Math.round(score * 50);
+  return Math.min(100, Math.max(0, calculatedScore));
 }
