@@ -19,5 +19,15 @@ CREATE TABLE IF NOT EXISTS nonprofits (
   revenue_growth REAL,
   sustainability REAL,
   scale REAL,
+  grant_distribution REAL,
+  geographic_reach REAL,
+  innovation_output REAL,
   location TEXT
+);
+
+CREATE TABLE IF NOT EXISTS approved_organizations (
+  id TEXT PRIMARY KEY,
+  nonprofit_id TEXT,
+  name TEXT,
+  sector TEXT
 );

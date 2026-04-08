@@ -4,6 +4,7 @@ import multer from 'multer'
 import dotenv from 'dotenv'
 import fs from 'fs/promises'
 import path from 'path'
+import crypto from 'crypto'
 import { fileURLToPath } from 'url'
 import { getDb } from './db.js'
 
@@ -76,7 +77,7 @@ app.get('/api/nonprofits', (req, res) => {
 })
 
 app.post('/api/explain', async (req, res) => {
-  const nonprofit = req.body || {}
+  const { nonprofit, weights } = req.body || {}
   
   if (!apiKey) {
     return res.status(500).json({ error: 'Missing OPENAI_QUIZ_API_KEY in .env.' })
@@ -87,14 +88,14 @@ app.post('/api/explain', async (req, res) => {
     
     const systemPrompt = {
       role: 'system',
-      content: 'You are an AI assistant for Big Green Tent. Your task is to provide a transparent, synthetic, and professional explanation (maximum 30 words) for why a nonprofit organization ranks highly based on the provided metrics. Always start your response exactly with: "This organization ranks highly due to...". Be extremely concise and objective.'
+      content: 'You are the Big Green Tent AI. You must explain why this nonprofit scored highly based strictly on the user\'s active weights and the nonprofit\'s raw data. Find the intersection: if the user weighted \'Innovation\' highly, and the org has high \'innovation_output\', highlight that. Start exactly with "This organization ranks highly due to..." and cite the specific metrics and mission elements that justify the score. Keep it under 35 words.'
     };
 
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
         systemPrompt,
-        { role: 'user', content: `Nonprofit data: ${JSON.stringify(nonprofit)}` }
+        { role: 'user', content: `Nonprofit data: ${JSON.stringify(nonprofit)}\nUser weights: ${JSON.stringify(weights)}` }
       ],
       temperature: 0.7,
     });
@@ -108,6 +109,47 @@ app.post('/api/explain', async (req, res) => {
   } catch (error) {
     console.error('Explain error:', error)
     res.status(500).json({ error: error.message || 'Explain failed.' })
+  }
+})
+
+app.post('/api/approve', (req, res) => {
+  const { nonprofit_id, name, sector } = req.body || {}
+  const db = getDb()
+  const id = crypto.randomUUID()
+  
+  try {
+    const stmt = db.prepare(
+      'INSERT INTO approved_organizations (id, nonprofit_id, name, sector) VALUES (?, ?, ?, ?)'
+    )
+    stmt.run(id, nonprofit_id, name, sector)
+    res.json({ success: true, id })
+  } catch (err) {
+    console.error('Insert error:', err)
+    res.status(500).json({ error: 'Failed to approve.' })
+  }
+})
+
+app.get('/api/approved', (req, res) => {
+  const db = getDb()
+  try {
+    const rows = db.prepare('SELECT * FROM approved_organizations').all()
+    res.json(rows)
+  } catch (err) {
+    console.error('Fetch error:', err)
+    res.status(500).json({ error: 'Failed to fetch approved orgs.' })
+  }
+})
+
+app.delete('/api/approve/:id', (req, res) => {
+  const { id } = req.params
+  const db = getDb()
+  try {
+    const stmt = db.prepare('DELETE FROM approved_organizations WHERE nonprofit_id = ?')
+    stmt.run(id)
+    res.json({ success: true })
+  } catch (err) {
+    console.error('Delete error:', err)
+    res.status(500).json({ error: 'Failed to remove.' })
   }
 })
 

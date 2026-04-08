@@ -9,13 +9,34 @@ export default function DiscoveryPage() {
     growth: 1,
     sustainability: 1,
     scale: 1,
+    grant_distribution: 1,
+    geographic_reach: 1,
+    innovation_output: 1,
   });
 
+  const [activeTab, setActiveTab] = useState('matches');
   const [results, setResults] = useState([]);
+  const [savedNonprofits, setSavedNonprofits] = useState([]);
+  
   const [selectedNonprofit, setSelectedNonprofit] = useState(null);
   const [explanation, setExplanation] = useState('');
   const [loadingExplain, setLoadingExplain] = useState(false);
 
+  // Load saved nonprofits on mount
+  useEffect(() => {
+    const fetchSaved = async () => {
+      try {
+        const res = await fetch('/api/approved');
+        const data = await res.json();
+        setSavedNonprofits(data);
+      } catch (err) {
+        console.error('Fetch saved error:', err);
+      }
+    };
+    fetchSaved();
+  }, []);
+
+  // Fetch matches when filters change
   useEffect(() => {
     const fetchResults = async () => {
       const params = new URLSearchParams();
@@ -25,13 +46,16 @@ export default function DiscoveryPage() {
       params.append('growth', weights.growth);
       params.append('sustainability', weights.sustainability);
       params.append('scale', weights.scale);
+      params.append('grant_distribution', weights.grant_distribution);
+      params.append('geographic_reach', weights.geographic_reach);
+      params.append('innovation_output', weights.innovation_output);
 
       try {
         const res = await fetch(`/api/nonprofits?${params.toString()}`);
         const data = await res.json();
         setResults(data);
       } catch (err) {
-        console.error('Fetch error:', err);
+        console.error('Fetch matches error:', err);
       }
     };
     fetchResults();
@@ -46,7 +70,7 @@ export default function DiscoveryPage() {
       const res = await fetch('/api/explain', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(nonprofit),
+        body: JSON.stringify({ nonprofit, weights }),
       });
       const data = await res.json();
       setExplanation(data.explanation);
@@ -58,9 +82,47 @@ export default function DiscoveryPage() {
     }
   };
 
+  const handleApprove = async (org) => {
+    try {
+      const payload = { nonprofit_id: org.id, name: org.name, sector: org.sector };
+      const res = await fetch('/api/approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error('Failed to approve');
+      
+      const { id } = await res.json();
+      // Add to local state
+      setSavedNonprofits(prev => [...prev, { id, nonprofit_id: org.id, name: org.name, sector: org.sector }]);
+      
+      alert(`Organization "${org.name}" added to shortlist!`);
+      setSelectedNonprofit(null);
+    } catch (err) {
+      console.error(err);
+      alert('Error approving organization.');
+    }
+  };
+
+  const handleRemove = async (orgId, e) => {
+    if(e) e.stopPropagation();
+    try {
+      const res = await fetch(`/api/approve/${orgId}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to remove');
+      setSavedNonprofits(prev => prev.filter(s => s.nonprofit_id !== orgId));
+    } catch (err) {
+      console.error(err);
+      alert('Error removing organization.');
+    }
+  };
+
   const handleWeightChange = (key, value) => {
     setWeights(prev => ({ ...prev, [key]: parseFloat(value) }));
   };
+
+  // Filter out saved orgs from matches
+  const savedIds = new Set(savedNonprofits.map(s => s.nonprofit_id));
+  const filteredMatches = results.filter(org => !savedIds.has(org.id));
 
   return (
     <div className="min-h-screen bg-green-50 text-green-950 p-6 font-body">
@@ -81,10 +143,20 @@ export default function DiscoveryPage() {
               className="p-3 bg-green-50 rounded-xl border border-green-200 outline-none focus:ring-2 focus:ring-green-400 transition cursor-pointer"
             >
               <option value="All">All Sectors</option>
-              <option value="Climate Change">Climate Change</option>
+              <option value="Built Environment & Sustainable Transportation">Built Environment & Sustainable Transportation</option>
+              <option value="Climate Change & Adaptation">Climate Change & Adaptation</option>
               <option value="Energy Systems">Energy Systems</option>
-              <option value="Water Systems">Water Systems</option>
-              <option value="Waste Management">Waste Management</option>
+              <option value="Environmental Education & Communication">Environmental Education & Communication</option>
+              <option value="Environmental Health">Environmental Health</option>
+              <option value="Environmental Justice & Equity">Environmental Justice & Equity</option>
+              <option value="Food & Agriculture">Food & Agriculture</option>
+              <option value="Green Finance & ESG">Green Finance & ESG</option>
+              <option value="Industrial Ecology & Circularity">Industrial Ecology & Circularity</option>
+              <option value="Land Conservation, Forests & Soils">Land Conservation, Forests & Soils</option>
+              <option value="Law & Public Policy">Law & Public Policy</option>
+              <option value="Water Systems & Marine & Coastal Ecosystems">Water Systems & Marine & Coastal Ecosystems</option>
+              <option value="Science, Research & Innovation">Science, Research & Innovation</option>
+              <option value="Wildlife & Biodiversity">Wildlife & Biodiversity</option>
             </select>
           </div>
 
@@ -102,12 +174,20 @@ export default function DiscoveryPage() {
             </select>
           </div>
 
-          <div className="flex flex-col gap-5 mt-4">
+          <div className="flex flex-col gap-4 mt-4">
             <h3 className="text-sm font-semibold text-green-900 border-b border-green-100 pb-2">Impact Weights</h3>
-            {['efficiency', 'growth', 'sustainability', 'scale'].map(w => (
+            {Object.entries({
+              efficiency: 'Efficiency',
+              growth: 'Growth',
+              sustainability: 'Sustainability',
+              scale: 'Scale',
+              grant_distribution: 'Grant Distribution',
+              geographic_reach: 'Geographic Reach',
+              innovation_output: 'Innovation Output'
+            }).map(([w, label]) => (
               <div key={w} className="flex flex-col gap-2">
-                <div className="flex justify-between text-xs font-bold text-green-700 capitalize">
-                  <span>{w}</span>
+                <div className="flex justify-between text-xs font-bold text-green-700">
+                  <span>{label}</span>
                   <span className="bg-green-100 px-2 py-0.5 rounded-full">{weights[w].toFixed(1)}</span>
                 </div>
                 <input 
@@ -126,7 +206,7 @@ export default function DiscoveryPage() {
           
           {/* Explain Box */}
           <AnimatePresence>
-            {selectedNonprofit && (
+            {selectedNonprofit && activeTab === 'matches' && (
               <motion.div 
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -158,55 +238,140 @@ export default function DiscoveryPage() {
                   ) : (
                     explanation
                   )}
+                  {explanation && !loadingExplain && (
+                    <div className="mt-6 pt-6 border-t border-green-800/50 flex flex-col gap-4">
+                      <h4 className="text-sm font-bold tracking-wide text-green-300 uppercase">Human evaluation checklist</h4>
+                      <div className="flex flex-col gap-2 text-sm text-green-100 font-normal">
+                        <label className="flex items-center gap-3 cursor-pointer group">
+                          <input type="checkbox" className="w-4 h-4 rounded border-green-600 text-green-500 focus:ring-green-500 bg-green-900 cursor-pointer" />
+                          <span className="group-hover:text-white transition">Verify program outcomes</span>
+                        </label>
+                        <label className="flex items-center gap-3 cursor-pointer group">
+                          <input type="checkbox" className="w-4 h-4 rounded border-green-600 text-green-500 focus:ring-green-500 bg-green-900 cursor-pointer" />
+                          <span className="group-hover:text-white transition">Review field reports</span>
+                        </label>
+                        <label className="flex items-center gap-3 cursor-pointer group">
+                          <input type="checkbox" className="w-4 h-4 rounded border-green-600 text-green-500 focus:ring-green-500 bg-green-900 cursor-pointer" />
+                          <span className="group-hover:text-white transition">Assess community engagement</span>
+                        </label>
+                        <label className="flex items-center gap-3 cursor-pointer group">
+                          <input type="checkbox" className="w-4 h-4 rounded border-green-600 text-green-500 focus:ring-green-500 bg-green-900 cursor-pointer" />
+                          <span className="group-hover:text-white transition">Contextualize financial data</span>
+                        </label>
+                      </div>
+                      <button 
+                        onClick={() => handleApprove(selectedNonprofit)}
+                        className="mt-3 font-bold w-full bg-green-500 hover:bg-green-400 text-green-950 py-3 rounded-xl transition shadow-sm hover:shadow"
+                      >
+                        Approve for Outreach
+                      </button>
+                    </div>
+                  )}
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
 
+          {/* Navigation Tabs */}
+          <div className="flex items-center border-b border-green-200">
+            <button
+              onClick={() => { setActiveTab('matches'); setSelectedNonprofit(null); }}
+              className={`pb-3 px-6 text-lg font-bold transition-all ${
+                activeTab === 'matches' 
+                  ? 'text-green-900 border-b-4 border-green-700' 
+                  : 'text-green-500 hover:text-green-700'
+              }`}
+            >
+              Top Matches <span className="ml-2 text-sm px-2 py-0.5 rounded-full bg-green-100 text-green-800">{filteredMatches.length}</span>
+            </button>
+            <button
+              onClick={() => { setActiveTab('saved'); setSelectedNonprofit(null); }}
+              className={`pb-3 px-6 text-lg font-bold transition-all ${
+                activeTab === 'saved' 
+                  ? 'text-green-900 border-b-4 border-green-700' 
+                  : 'text-green-500 hover:text-green-700'
+              }`}
+            >
+              Saved <span className="ml-2 text-sm px-2 py-0.5 rounded-full bg-green-100 text-green-800">{savedNonprofits.length}</span>
+            </button>
+          </div>
+
           {/* Results List */}
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-green-100">
-            <h2 className="text-xl font-bold text-green-900 mb-6 flex justify-between items-center">
-              <span>Top Matches</span>
-              <span className="text-sm font-bold text-green-600 bg-green-50 px-4 py-1.5 rounded-full ring-1 ring-green-200">{results.length} found</span>
-            </h2>
-            <div className="flex flex-col gap-3">
-              {results.length === 0 ? (
-                <div className="text-center py-12 text-green-600 bg-green-50/50 rounded-xl border border-dashed border-green-200">
-                  <span className="block text-2xl mb-2">🌿</span>
-                  No organizations match your precise criteria. Try broadening your filters.
-                </div>
-              ) : (
-                results.map((org) => (
-                  <motion.div 
-                    layout
-                    key={org.id} 
-                    onClick={() => handleExplain(org)}
-                    className={`relative group cursor-pointer border ${selectedNonprofit?.id === org.id ? 'border-green-500 bg-green-50/50' : 'border-green-100'} p-5 rounded-xl hover:border-green-400 hover:bg-green-50/80 transition-all overflow-hidden`}
-                  >
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
-                      <div className="md:w-2/3">
-                        <h4 className="font-bold text-lg text-green-950 group-hover:text-green-700 transition">{org.name}</h4>
-                        <p className="text-sm text-green-700 line-clamp-1 mt-1">{org.mission}</p>
-                      </div>
-                      <div className="flex-shrink-0 flex flex-col md:items-end justify-center gap-1">
-                        <span className="text-xs font-bold text-green-600 uppercase tracking-wider mb-1">Match Score</span>
-                        <div className="flex items-center gap-3">
-                          <div className="w-24 md:w-32 h-2.5 bg-green-100 rounded-full overflow-hidden">
-                            <motion.div 
-                              initial={{ width: 0 }}
-                              animate={{ width: `${org.score}%` }}
-                              transition={{ duration: 0.7, ease: 'easeOut' }}
-                              className="h-full bg-green-500"
-                            />
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-green-100 min-h-[400px]">
+            {activeTab === 'matches' && (
+              <div className="flex flex-col gap-3">
+                {filteredMatches.length === 0 ? (
+                  <div className="text-center py-16 px-6 text-green-700 bg-green-50/50 rounded-xl border border-dashed border-green-200">
+                    <span className="block text-3xl mb-3">🌿</span>
+                    <span className="block font-medium">No new organizations match your current filters.</span>
+                    <span className="block text-sm mt-1 text-green-600">Try adjusting the sliders or the sector.</span>
+                  </div>
+                ) : (
+                  filteredMatches.map((org) => (
+                    <motion.div 
+                      layout
+                      key={org.id} 
+                      onClick={() => handleExplain(org)}
+                      className={`relative group cursor-pointer border ${selectedNonprofit?.id === org.id ? 'border-green-500 bg-green-50/50' : 'border-green-100'} p-5 rounded-xl hover:border-green-400 hover:bg-green-50/80 transition-all overflow-hidden`}
+                    >
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
+                        <div className="md:w-2/3">
+                          <h4 className="font-bold text-lg text-green-950 group-hover:text-green-700 transition">{org.name}</h4>
+                          <p className="text-sm text-green-700 line-clamp-1 mt-1">{org.mission}</p>
+                        </div>
+                        <div className="flex-shrink-0 flex flex-col md:items-end justify-center gap-1">
+                          <span className="text-xs font-bold text-green-600 uppercase tracking-wider mb-1">Match Score</span>
+                          <div className="flex items-center gap-3">
+                            <div className="w-24 md:w-32 h-2.5 bg-green-100 rounded-full overflow-hidden">
+                              <motion.div 
+                                initial={{ width: 0 }}
+                                animate={{ width: `${org.score}%` }}
+                                transition={{ duration: 0.7, ease: 'easeOut' }}
+                                className="h-full bg-green-500"
+                              />
+                            </div>
+                            <span className="font-black text-green-900 w-8 text-right">{org.score}</span>
                           </div>
-                          <span className="font-black text-green-900 w-8 text-right">{org.score}</span>
                         </div>
                       </div>
-                    </div>
-                  </motion.div>
-                ))
-              )}
-            </div>
+                    </motion.div>
+                  ))
+                )}
+              </div>
+            )}
+
+            {activeTab === 'saved' && (
+              <div className="flex flex-col gap-3">
+                {savedNonprofits.length === 0 ? (
+                  <div className="text-center py-16 px-6 text-green-700 bg-green-50/50 rounded-xl border border-dashed border-green-200">
+                    <span className="block text-3xl mb-3">📁</span>
+                    <span className="block font-medium">Your shortlist is empty.</span>
+                    <span className="block text-sm mt-1 text-green-600">Explore the Top Matches and approve organizations to see them here.</span>
+                  </div>
+                ) : (
+                  savedNonprofits.map((org) => (
+                    <motion.div 
+                      layout
+                      key={org.nonprofit_id} 
+                      className="relative border border-green-200 bg-green-50 p-5 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-4"
+                    >
+                      <div>
+                        <h4 className="font-bold text-lg text-green-950">{org.name}</h4>
+                        <p className="text-sm text-green-700 mt-1 uppercase tracking-wider font-semibold">{org.sector}</p>
+                      </div>
+                      <div className="flex-shrink-0 flex items-center gap-4 border-l border-green-200 pl-4">
+                        <button 
+                          onClick={(e) => handleRemove(org.nonprofit_id, e)}
+                          className="bg-white hover:bg-red-50 text-red-600 hover:text-red-700 hover:border-red-200 border border-transparent font-semibold py-2 px-4 rounded-lg transition text-sm flex items-center gap-2 shadow-sm"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </motion.div>
+                  ))
+                )}
+              </div>
+            )}
           </div>
 
         </div>
