@@ -22,7 +22,8 @@ CREATE TABLE IF NOT EXISTS nonprofits (
   grant_distribution REAL,
   geographic_reach REAL,
   innovation_output REAL,
-  location TEXT
+  location TEXT,
+  enrichment_summary TEXT
 );
 
 CREATE TABLE IF NOT EXISTS approved_organizations (

@@ -132,7 +132,7 @@ app.post('/api/approve', (req, res) => {
 app.get('/api/approved', (req, res) => {
   const db = getDb()
   try {
-    const rows = db.prepare('SELECT * FROM approved_organizations').all()
+    const rows = db.prepare('SELECT a.id as approval_id, n.* FROM approved_organizations a JOIN nonprofits n ON a.nonprofit_id = n.id').all()
     res.json(rows)
   } catch (err) {
     console.error('Fetch error:', err)

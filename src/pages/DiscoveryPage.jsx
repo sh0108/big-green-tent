@@ -93,8 +93,8 @@ export default function DiscoveryPage() {
       if (!res.ok) throw new Error('Failed to approve');
       
       const { id } = await res.json();
-      // Add to local state
-      setSavedNonprofits(prev => [...prev, { id, nonprofit_id: org.id, name: org.name, sector: org.sector }]);
+      // Add to local state with all parsed org metrics
+      setSavedNonprofits(prev => [...prev, { ...org, approval_id: id, nonprofit_id: org.id }]);
       
       alert(`Organization "${org.name}" added to shortlist!`);
       setSelectedNonprofit(null);
@@ -353,19 +353,38 @@ export default function DiscoveryPage() {
                     <motion.div 
                       layout
                       key={org.nonprofit_id} 
-                      className="relative border border-green-200 bg-green-50 p-5 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-4"
+                      className="relative border border-green-200 bg-green-50 p-6 rounded-2xl flex flex-col gap-4 shadow-sm hover:shadow-md transition"
                     >
-                      <div>
-                        <h4 className="font-bold text-lg text-green-950">{org.name}</h4>
-                        <p className="text-sm text-green-700 mt-1 uppercase tracking-wider font-semibold">{org.sector}</p>
-                      </div>
-                      <div className="flex-shrink-0 flex items-center gap-4 border-l border-green-200 pl-4">
+                      <div className="flex flex-col md:flex-row justify-between items-start gap-4">
+                        <div>
+                          <h4 className="font-bold text-2xl text-green-950">{org.name}</h4>
+                          <p className="text-sm text-green-700 mt-1 uppercase tracking-wider font-semibold">{org.sector}</p>
+                        </div>
                         <button 
                           onClick={(e) => handleRemove(org.nonprofit_id, e)}
-                          className="bg-white hover:bg-red-50 text-red-600 hover:text-red-700 hover:border-red-200 border border-transparent font-semibold py-2 px-4 rounded-lg transition text-sm flex items-center gap-2 shadow-sm"
+                          className="bg-white hover:bg-red-50 text-red-500 hover:text-red-700 border border-red-200 hover:border-red-300 font-bold py-2 px-6 rounded-xl transition text-sm shadow-sm flex-shrink-0"
                         >
                           Remove
                         </button>
+                      </div>
+
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2 pt-4 border-t border-green-200/60">
+                        {[
+                          { label: 'Program Efficiency', value: org.program_efficiency },
+                          { label: 'Revenue Growth', value: org.revenue_growth },
+                          { label: 'Sustainability', value: org.sustainability },
+                          { label: 'Scale', value: org.scale },
+                          { label: 'Grant Distribution', value: org.grant_distribution },
+                          { label: 'Geographic Reach', value: org.geographic_reach },
+                          { label: 'Innovation Output', value: org.innovation_output }
+                        ].map(metric => (
+                          <div key={metric.label} className="bg-white p-4 rounded-xl border border-green-100 shadow-sm flex flex-col gap-1">
+                            <span className="text-[10px] sm:text-xs font-bold text-green-700 uppercase tracking-wider">{metric.label}</span>
+                            <span className="text-xl sm:text-2xl font-black text-green-900">
+                              {metric.value != null ? `${(metric.value * 50).toFixed(0)}/100` : '—'}
+                            </span>
+                          </div>
+                        ))}
                       </div>
                     </motion.div>
                   ))
