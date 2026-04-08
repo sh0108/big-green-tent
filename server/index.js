@@ -4,7 +4,11 @@ import multer from 'multer'
 import dotenv from 'dotenv'
 import fs from 'fs/promises'
 import path from 'path'
+import { fileURLToPath } from 'url'
 import { getDb } from './db.js'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 import { computeScore } from './scoring.js'
 import { seedIfEmpty } from './seed.js'
 import OpenAI from 'openai'
@@ -32,6 +36,7 @@ const upload = multer({
 })
 
 app.use(express.json({ limit: '1mb' }))
+app.use(express.static(path.join(__dirname, '../dist')))
 
 app.get('/api/nonprofits', (req, res) => {
   const { sector, maturity, efficiency, growth, sustainability, scale } = req.query;
@@ -104,6 +109,10 @@ app.post('/api/explain', async (req, res) => {
     console.error('Explain error:', error)
     res.status(500).json({ error: error.message || 'Explain failed.' })
   }
+})
+
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../dist/index.html'))
 })
 
 app.listen(PORT, () => {
