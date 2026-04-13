@@ -1,9 +1,59 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useEffect, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
+import { ArrowRight, Check, Leaf, MapPin, Sparkles, Trees, X } from 'lucide-react'
+import { Badge, Button, EmptyState, FieldLabel, SectionHeading, Surface, TabButton } from '../components/ui'
+
+const sectorOptions = [
+  'All',
+  'Built Environment & Sustainable Transportation',
+  'Climate Change & Adaptation',
+  'Energy Systems',
+  'Environmental Education & Communication',
+  'Environmental Health',
+  'Environmental Justice & Equity',
+  'Food & Agriculture',
+  'Green Finance & ESG',
+  'Industrial Ecology & Circularity',
+  'Land Conservation, Forests & Soils',
+  'Law & Public Policy',
+  'Water Systems & Marine & Coastal Ecosystems',
+  'Science, Research & Innovation',
+  'Wildlife & Biodiversity',
+]
+
+const maturityOptions = ['All', 'Emerging', 'Established', 'Mature']
+
+const weightFields = [
+  ['efficiency', 'Program efficiency'],
+  ['growth', 'Revenue growth'],
+  ['sustainability', 'Sustainability'],
+  ['scale', 'Scale'],
+  ['grant_distribution', 'Grant distribution'],
+  ['geographic_reach', 'Geographic reach'],
+  ['innovation_output', 'Innovation output'],
+]
+
+const metricFields = [
+  ['program_efficiency', 'Efficiency'],
+  ['revenue_growth', 'Growth'],
+  ['sustainability', 'Sustainability'],
+  ['scale', 'Scale'],
+  ['grant_distribution', 'Grant reach'],
+  ['geographic_reach', 'Footprint'],
+  ['innovation_output', 'Innovation'],
+]
+
+function getWeightTemperature(value) {
+  if (value >= 1.6) return 'High'
+  if (value >= 1.1) return 'Balanced'
+  return 'Light'
+}
 
 export default function DiscoveryPage() {
-  const [sector, setSector] = useState('All');
-  const [maturity, setMaturity] = useState('All');
+  const MotionButton = motion.button
+  const MotionDiv = motion.div
+  const [sector, setSector] = useState('All')
+  const [maturity, setMaturity] = useState('All')
   const [weights, setWeights] = useState({
     efficiency: 1,
     growth: 1,
@@ -12,399 +62,471 @@ export default function DiscoveryPage() {
     grant_distribution: 1,
     geographic_reach: 1,
     innovation_output: 1,
-  });
+  })
+  const [activeTab, setActiveTab] = useState('matches')
+  const [results, setResults] = useState([])
+  const [savedNonprofits, setSavedNonprofits] = useState([])
+  const [selectedNonprofit, setSelectedNonprofit] = useState(null)
+  const [explanation, setExplanation] = useState('')
+  const [loadingExplain, setLoadingExplain] = useState(false)
+  const [toast, setToast] = useState(null)
 
-  const [activeTab, setActiveTab] = useState('matches');
-  const [results, setResults] = useState([]);
-  const [savedNonprofits, setSavedNonprofits] = useState([]);
-  
-  const [selectedNonprofit, setSelectedNonprofit] = useState(null);
-  const [explanation, setExplanation] = useState('');
-  const [loadingExplain, setLoadingExplain] = useState(false);
-
-  // Load saved nonprofits on mount
   useEffect(() => {
     const fetchSaved = async () => {
       try {
-        const res = await fetch('/api/approved');
-        const data = await res.json();
-        setSavedNonprofits(data);
+        const res = await fetch('/api/approved')
+        const data = await res.json()
+        setSavedNonprofits(data)
       } catch (err) {
-        console.error('Fetch saved error:', err);
+        console.error('Fetch saved error:', err)
       }
-    };
-    fetchSaved();
-  }, []);
+    }
+    fetchSaved()
+  }, [])
 
-  // Fetch matches when filters change
   useEffect(() => {
     const fetchResults = async () => {
-      const params = new URLSearchParams();
-      if (sector !== 'All') params.append('sector', sector);
-      if (maturity !== 'All') params.append('maturity', maturity);
-      params.append('efficiency', weights.efficiency);
-      params.append('growth', weights.growth);
-      params.append('sustainability', weights.sustainability);
-      params.append('scale', weights.scale);
-      params.append('grant_distribution', weights.grant_distribution);
-      params.append('geographic_reach', weights.geographic_reach);
-      params.append('innovation_output', weights.innovation_output);
+      const params = new URLSearchParams()
+      if (sector !== 'All') params.append('sector', sector)
+      if (maturity !== 'All') params.append('maturity', maturity)
+      params.append('efficiency', weights.efficiency)
+      params.append('growth', weights.growth)
+      params.append('sustainability', weights.sustainability)
+      params.append('scale', weights.scale)
+      params.append('grant_distribution', weights.grant_distribution)
+      params.append('geographic_reach', weights.geographic_reach)
+      params.append('innovation_output', weights.innovation_output)
 
       try {
-        const res = await fetch(`/api/nonprofits?${params.toString()}`);
-        const data = await res.json();
-        setResults(data);
+        const res = await fetch(`/api/nonprofits?${params.toString()}`)
+        const data = await res.json()
+        setResults(data)
       } catch (err) {
-        console.error('Fetch matches error:', err);
+        console.error('Fetch matches error:', err)
       }
-    };
-    fetchResults();
-  }, [sector, maturity, weights]);
+    }
+
+    fetchResults()
+  }, [sector, maturity, weights])
+
+  useEffect(() => {
+    if (!toast) return undefined
+    const timer = window.setTimeout(() => setToast(null), 3200)
+    return () => window.clearTimeout(timer)
+  }, [toast])
+
+  const handleWeightChange = (key, value) => {
+    setWeights((prev) => ({ ...prev, [key]: parseFloat(value) }))
+  }
 
   const handleExplain = async (nonprofit) => {
-    setSelectedNonprofit(nonprofit);
-    setExplanation('');
-    setLoadingExplain(true);
-    
+    setSelectedNonprofit(nonprofit)
+    setExplanation('')
+    setLoadingExplain(true)
+
     try {
       const res = await fetch('/api/explain', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ nonprofit, weights }),
-      });
-      const data = await res.json();
-      setExplanation(data.explanation);
+      })
+      const data = await res.json()
+      setExplanation(data.explanation || 'No explanation was returned for this organization.')
     } catch (err) {
-      console.error(err);
-      setExplanation('Failed to generate explanation. Please try again.');
+      console.error(err)
+      setExplanation('Failed to generate explanation. Please try again.')
     } finally {
-      setLoadingExplain(false);
+      setLoadingExplain(false)
     }
-  };
+  }
 
   const handleApprove = async (org) => {
     try {
-      const payload = { nonprofit_id: org.id, name: org.name, sector: org.sector };
+      const payload = { nonprofit_id: org.id, name: org.name, sector: org.sector }
       const res = await fetch('/api/approve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
-      });
-      if (!res.ok) throw new Error('Failed to approve');
-      
-      const { id } = await res.json();
-      // Add to local state with all parsed org metrics
-      setSavedNonprofits(prev => [...prev, { ...org, approval_id: id, nonprofit_id: org.id }]);
-      
-      alert(`Organization "${org.name}" added to shortlist!`);
-      setSelectedNonprofit(null);
-    } catch (err) {
-      console.error(err);
-      alert('Error approving organization.');
-    }
-  };
+      })
+      if (!res.ok) throw new Error('Failed to approve')
 
-  const handleRemove = async (orgId, e) => {
-    if(e) e.stopPropagation();
+      const { id } = await res.json()
+      setSavedNonprofits((prev) => [...prev, { ...org, approval_id: id, nonprofit_id: org.id }])
+      setSelectedNonprofit(null)
+      setToast({ kind: 'success', message: `${org.name} moved into the outreach shortlist.` })
+    } catch (err) {
+      console.error(err)
+      setToast({ kind: 'error', message: 'We could not add that organization right now.' })
+    }
+  }
+
+  const handleRemove = async (orgId, orgName, event) => {
+    if (event) event.stopPropagation()
     try {
-      const res = await fetch(`/api/approve/${orgId}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('Failed to remove');
-      setSavedNonprofits(prev => prev.filter(s => s.nonprofit_id !== orgId));
+      const res = await fetch(`/api/approve/${orgId}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Failed to remove')
+      setSavedNonprofits((prev) => prev.filter((saved) => saved.nonprofit_id !== orgId))
+      setToast({ kind: 'success', message: `${orgName} was removed from the shortlist.` })
     } catch (err) {
-      console.error(err);
-      alert('Error removing organization.');
+      console.error(err)
+      setToast({ kind: 'error', message: 'We could not remove that organization right now.' })
     }
-  };
+  }
 
-  const handleWeightChange = (key, value) => {
-    setWeights(prev => ({ ...prev, [key]: parseFloat(value) }));
-  };
-
-  // Filter out saved orgs from matches
-  const savedIds = new Set(savedNonprofits.map(s => s.nonprofit_id));
-  const filteredMatches = results.filter(org => !savedIds.has(org.id));
+  const savedIds = new Set(savedNonprofits.map((saved) => saved.nonprofit_id))
+  const filteredMatches = results.filter((org) => !savedIds.has(org.id))
+  const highlightedResult = filteredMatches[0]
 
   return (
-    <div className="min-h-screen bg-green-50 text-green-950 p-6 font-body">
-      <div className="max-w-6xl mx-auto flex flex-col md:flex-row gap-8">
-        
-        {/* Sidebar Controls */}
-        <div className="w-full md:w-1/3 bg-white p-6 rounded-2xl shadow-sm border border-green-100 flex flex-col gap-6 h-fit sticky top-6">
-          <div>
-            <h2 className="text-3xl font-bold text-green-900 tracking-tight">Big Green Tent</h2>
-            <p className="text-sm text-green-600 mt-2">Discover environmental nonprofits tailored to your impact goals.</p>
-          </div>
+    <div className="relative flex flex-col gap-8">
+      <Surface strong className="dashboard-tent hero-marks relative overflow-hidden px-6 py-6 text-cream sm:px-8">
+        <div className="relative z-10 grid gap-6 lg:grid-cols-[minmax(0,1.35fr),320px] lg:items-start">
+          <div className="max-w-3xl">
+            <p className="eyebrow mb-3 text-cream/72">Discovery dashboard</p>
+            <h1 className="font-cta text-[clamp(2rem,5vw,3.4rem)] leading-tight text-cream">
+              Internal workspace for evaluating and shortlisting environmental nonprofits
+            </h1>
+            <p className="mt-4 max-w-2xl text-base leading-7 text-cream/84">
+              Compare vetted organizations, tune scoring priorities, generate AI explanations, and move promising groups into the outreach pipeline with accessible, task-first controls.
+            </p>
 
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-semibold text-green-900">Environmental Sector</label>
-            <select 
-              value={sector}
-              onChange={(e) => setSector(e.target.value)}
-              className="p-3 bg-green-50 rounded-xl border border-green-200 outline-none focus:ring-2 focus:ring-green-400 transition cursor-pointer"
-            >
-              <option value="All">All Sectors</option>
-              <option value="Built Environment & Sustainable Transportation">Built Environment & Sustainable Transportation</option>
-              <option value="Climate Change & Adaptation">Climate Change & Adaptation</option>
-              <option value="Energy Systems">Energy Systems</option>
-              <option value="Environmental Education & Communication">Environmental Education & Communication</option>
-              <option value="Environmental Health">Environmental Health</option>
-              <option value="Environmental Justice & Equity">Environmental Justice & Equity</option>
-              <option value="Food & Agriculture">Food & Agriculture</option>
-              <option value="Green Finance & ESG">Green Finance & ESG</option>
-              <option value="Industrial Ecology & Circularity">Industrial Ecology & Circularity</option>
-              <option value="Land Conservation, Forests & Soils">Land Conservation, Forests & Soils</option>
-              <option value="Law & Public Policy">Law & Public Policy</option>
-              <option value="Water Systems & Marine & Coastal Ecosystems">Water Systems & Marine & Coastal Ecosystems</option>
-              <option value="Science, Research & Innovation">Science, Research & Innovation</option>
-              <option value="Wildlife & Biodiversity">Wildlife & Biodiversity</option>
-            </select>
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-semibold text-green-900">Maturity</label>
-            <select 
-              value={maturity}
-              onChange={(e) => setMaturity(e.target.value)}
-              className="p-3 bg-green-50 rounded-xl border border-green-200 outline-none focus:ring-2 focus:ring-green-400 transition cursor-pointer"
-            >
-              <option value="All">All Stages</option>
-              <option value="Emerging">Emerging</option>
-              <option value="Established">Established</option>
-              <option value="Mature">Mature</option>
-            </select>
-          </div>
-
-          <div className="flex flex-col gap-4 mt-4">
-            <h3 className="text-sm font-semibold text-green-900 border-b border-green-100 pb-2">Impact Weights</h3>
-            {Object.entries({
-              efficiency: 'Efficiency',
-              growth: 'Growth',
-              sustainability: 'Sustainability',
-              scale: 'Scale',
-              grant_distribution: 'Grant Distribution',
-              geographic_reach: 'Geographic Reach',
-              innovation_output: 'Innovation Output'
-            }).map(([w, label]) => (
-              <div key={w} className="flex flex-col gap-2">
-                <div className="flex justify-between text-xs font-bold text-green-700">
-                  <span>{label}</span>
-                  <span className="bg-green-100 px-2 py-0.5 rounded-full">{weights[w].toFixed(1)}</span>
-                </div>
-                <input 
-                  type="range" min="0" max="2" step="0.1" 
-                  value={weights[w]} 
-                  onChange={(e) => handleWeightChange(w, e.target.value)}
-                  className="w-full accent-green-600 cursor-pointer"
-                />
+            <div className="mt-6 grid gap-3 sm:grid-cols-3">
+              <div className="rounded-[1.4rem] border border-white/12 bg-white/8 px-4 py-4">
+                <p className="text-xs uppercase tracking-[0.18em] text-cream/62">Available matches</p>
+                <p className="mt-2 font-cta text-3xl text-cream">{filteredMatches.length}</p>
               </div>
-            ))}
+              <div className="rounded-[1.4rem] border border-white/12 bg-white/8 px-4 py-4">
+                <p className="text-xs uppercase tracking-[0.18em] text-cream/62">Saved shortlist</p>
+                <p className="mt-2 font-cta text-3xl text-cream">{savedNonprofits.length}</p>
+              </div>
+              <div className="rounded-[1.4rem] border border-white/12 bg-white/8 px-4 py-4">
+                <p className="text-xs uppercase tracking-[0.18em] text-cream/62">Current sector</p>
+                <p className="mt-2 font-cta text-lg text-cream">{sector === 'All' ? 'All sectors' : sector}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-[1.7rem] border border-white/12 bg-white/8 px-5 py-5">
+            <p className="eyebrow mb-3 text-cream/70">Queue snapshot</p>
+            <div className="space-y-4">
+              <div>
+                <p className="text-xs uppercase tracking-[0.18em] text-cream/58">Top current match</p>
+                <p className="mt-2 font-cta text-xl text-cream">{highlightedResult?.name || 'No active match'}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-[0.18em] text-cream/58">AI review status</p>
+                <div className="mt-2 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-sm text-cream/84">
+                  <Sparkles className="h-4 w-4 text-sun" />
+                  Ready on demand
+                </div>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-[0.18em] text-cream/58">Primary workflow</p>
+                <p className="mt-2 text-sm leading-6 text-cream/78">Filter, compare, explain, approve, then transition to outreach.</p>
+              </div>
+            </div>
           </div>
         </div>
+      </Surface>
 
-        {/* Main Content: Results & Explain Box */}
-        <div className="w-full md:w-2/3 flex flex-col gap-6 pb-20">
-          
-          {/* Explain Box */}
-          <AnimatePresence>
-            {selectedNonprofit && activeTab === 'matches' && (
-              <motion.div 
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                className="bg-green-900 text-green-50 p-6 rounded-2xl shadow-xl border border-green-800"
-              >
-                <div className="flex justify-between items-start mb-3">
-                  <h3 className="text-2xl font-bold tracking-tight">{selectedNonprofit.name}</h3>
-                  <button 
-                    onClick={() => setSelectedNonprofit(null)} 
-                    className="text-green-400 hover:text-white bg-green-800 hover:bg-green-700 w-8 h-8 rounded-full flex items-center justify-center transition"
-                  >
-                    ✕
-                  </button>
-                </div>
-                <div className="flex flex-wrap gap-2 text-xs font-semibold text-green-100 mb-5">
-                  <span className="bg-green-800 px-3 py-1 rounded-lg border border-green-700">{selectedNonprofit.sector}</span>
-                  <span className="bg-green-800 px-3 py-1 rounded-lg border border-green-700">{selectedNonprofit.maturity}</span>
-                  <span className="bg-green-800 px-3 py-1 rounded-lg border border-green-700">{selectedNonprofit.location}</span>
-                </div>
-                <div className="bg-green-950/50 p-4 rounded-xl min-h-[4rem] text-sm leading-relaxed text-green-50 italic">
-                  {loadingExplain ? (
-                    <span className="animate-pulse flex items-center gap-2">
-                      <span className="w-2 h-2 bg-green-400 rounded-full animate-bounce"></span>
-                      <span className="w-2 h-2 bg-green-400 rounded-full animate-bounce delay-100"></span>
-                      <span className="w-2 h-2 bg-green-400 rounded-full animate-bounce delay-200"></span>
-                      AI is analyzing this organization...
-                    </span>
-                  ) : (
-                    explanation
-                  )}
-                  {explanation && !loadingExplain && (
-                    <div className="mt-6 pt-6 border-t border-green-800/50 flex flex-col gap-4">
-                      <h4 className="text-sm font-bold tracking-wide text-green-300 uppercase">Human evaluation checklist</h4>
-                      <div className="flex flex-col gap-2 text-sm text-green-100 font-normal">
-                        <label className="flex items-center gap-3 cursor-pointer group">
-                          <input type="checkbox" className="w-4 h-4 rounded border-green-600 text-green-500 focus:ring-green-500 bg-green-900 cursor-pointer" />
-                          <span className="group-hover:text-white transition">Verify program outcomes</span>
-                        </label>
-                        <label className="flex items-center gap-3 cursor-pointer group">
-                          <input type="checkbox" className="w-4 h-4 rounded border-green-600 text-green-500 focus:ring-green-500 bg-green-900 cursor-pointer" />
-                          <span className="group-hover:text-white transition">Review field reports</span>
-                        </label>
-                        <label className="flex items-center gap-3 cursor-pointer group">
-                          <input type="checkbox" className="w-4 h-4 rounded border-green-600 text-green-500 focus:ring-green-500 bg-green-900 cursor-pointer" />
-                          <span className="group-hover:text-white transition">Assess community engagement</span>
-                        </label>
-                        <label className="flex items-center gap-3 cursor-pointer group">
-                          <input type="checkbox" className="w-4 h-4 rounded border-green-600 text-green-500 focus:ring-green-500 bg-green-900 cursor-pointer" />
-                          <span className="group-hover:text-white transition">Contextualize financial data</span>
-                        </label>
-                      </div>
-                      <button 
-                        onClick={() => handleApprove(selectedNonprofit)}
-                        className="mt-3 font-bold w-full bg-green-500 hover:bg-green-400 text-green-950 py-3 rounded-xl transition shadow-sm hover:shadow"
-                      >
-                        Approve for Outreach
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Navigation Tabs */}
-          <div className="flex items-center border-b border-green-200">
-            <button
-              onClick={() => { setActiveTab('matches'); setSelectedNonprofit(null); }}
-              className={`pb-3 px-6 text-lg font-bold transition-all ${
-                activeTab === 'matches' 
-                  ? 'text-green-900 border-b-4 border-green-700' 
-                  : 'text-green-500 hover:text-green-700'
-              }`}
-            >
-              Top Matches <span className="ml-2 text-sm px-2 py-0.5 rounded-full bg-green-100 text-green-800">{filteredMatches.length}</span>
-            </button>
-            <button
-              onClick={() => { setActiveTab('saved'); setSelectedNonprofit(null); }}
-              className={`pb-3 px-6 text-lg font-bold transition-all ${
-                activeTab === 'saved' 
-                  ? 'text-green-900 border-b-4 border-green-700' 
-                  : 'text-green-500 hover:text-green-700'
-              }`}
-            >
-              Saved <span className="ml-2 text-sm px-2 py-0.5 rounded-full bg-green-100 text-green-800">{savedNonprofits.length}</span>
-            </button>
+      <section className="grid gap-6 xl:grid-cols-[340px,minmax(0,1fr)]">
+        <Surface className="h-fit px-5 py-6 sm:px-6">
+          <div className="mb-6">
+            <p className="eyebrow mb-3">Stewardship settings</p>
+            <h2 className="font-cta text-2xl text-forest">Shape the discovery lens</h2>
+            <p className="body-copy mt-3 text-sm">
+              Tune for organizations that match your goals, maturity preferences, and impact priorities without changing the underlying scoring engine.
+            </p>
           </div>
 
-          {/* Results List */}
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-green-100 min-h-[400px]">
-            {activeTab === 'matches' && (
-              <div className="flex flex-col gap-3">
-                {filteredMatches.length === 0 ? (
-                  <div className="text-center py-16 px-6 text-green-700 bg-green-50/50 rounded-xl border border-dashed border-green-200">
-                    <span className="block text-3xl mb-3">🌿</span>
-                    <span className="block font-medium">No new organizations match your current filters.</span>
-                    <span className="block text-sm mt-1 text-green-600">Try adjusting the sliders or the sector.</span>
-                  </div>
-                ) : (
-                  filteredMatches.map((org) => (
-                    <motion.div 
-                      layout
-                      key={org.id} 
-                      onClick={() => handleExplain(org)}
-                      className={`relative group cursor-pointer border ${selectedNonprofit?.id === org.id ? 'border-green-500 bg-green-50/50' : 'border-green-100'} p-5 rounded-xl hover:border-green-400 hover:bg-green-50/80 transition-all overflow-hidden`}
-                    >
-                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
-                        <div className="md:w-2/3">
-                          <h4 className="font-bold text-lg text-green-950 group-hover:text-green-700 transition">{org.name}</h4>
-                          <p className="text-sm text-green-700 line-clamp-1 mt-1">{org.mission}</p>
-                          {org.enrichment_summary && (
-                            <p className="text-sm text-emerald-700 italic mt-2 border-l-2 border-emerald-400 pl-2">
-                              <span className="font-bold text-emerald-600">✨ AI Insight:</span> {org.enrichment_summary}
-                            </p>
-                          )}
-                        </div>
-                        <div className="flex-shrink-0 flex flex-col md:items-end justify-center gap-1">
-                          <span className="text-xs font-bold text-green-600 uppercase tracking-wider mb-1">Match Score</span>
-                          <div className="flex items-center gap-3">
-                            <div className="w-24 md:w-32 h-2.5 bg-green-100 rounded-full overflow-hidden">
-                              <motion.div 
-                                initial={{ width: 0 }}
-                                animate={{ width: `${org.score}%` }}
-                                transition={{ duration: 0.7, ease: 'easeOut' }}
-                                className="h-full bg-green-500"
-                              />
-                            </div>
-                            <span className="font-black text-green-900 w-8 text-right">{org.score}</span>
-                          </div>
-                        </div>
+          <div className="brand-divider mb-6" />
+
+          <div className="space-y-5">
+            <div>
+              <FieldLabel title="Environmental sector" detail="Choose a thematic focus" />
+              <select value={sector} onChange={(event) => setSector(event.target.value)} className="brand-input">
+                {sectorOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option === 'All' ? 'All sectors' : option}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <FieldLabel title="Organization maturity" detail="Filter by lifecycle stage" />
+              <select value={maturity} onChange={(event) => setMaturity(event.target.value)} className="brand-input">
+                {maturityOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option === 'All' ? 'All stages' : option}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <Surface className="soft-grid px-4 py-4">
+              <p className="eyebrow mb-4">Impact weighting</p>
+              <div className="space-y-4">
+                {weightFields.map(([key, label]) => (
+                  <div key={key}>
+                    <div className="mb-2 flex items-center justify-between gap-3">
+                      <div>
+                        <p className="font-cta text-sm capitalize text-forest">{label}</p>
+                        <p className="text-xs text-forest/48">{getWeightTemperature(weights[key])} emphasis</p>
                       </div>
-                    </motion.div>
-                  ))
-                )}
+                      <span className="rounded-full bg-forest/6 px-2.5 py-1 text-xs font-semibold text-forest">{weights[key].toFixed(1)}</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="2"
+                      step="0.1"
+                      value={weights[key]}
+                      onChange={(event) => handleWeightChange(key, event.target.value)}
+                      className="range-track"
+                    />
+                  </div>
+                ))}
               </div>
-            )}
+            </Surface>
+          </div>
+        </Surface>
 
-            {activeTab === 'saved' && (
-              <div className="flex flex-col gap-3">
-                {savedNonprofits.length === 0 ? (
-                  <div className="text-center py-16 px-6 text-green-700 bg-green-50/50 rounded-xl border border-dashed border-green-200">
-                    <span className="block text-3xl mb-3">📁</span>
-                    <span className="block font-medium">Your shortlist is empty.</span>
-                    <span className="block text-sm mt-1 text-green-600">Explore the Top Matches and approve organizations to see them here.</span>
-                  </div>
-                ) : (
-                  savedNonprofits.map((org) => (
-                    <motion.div 
-                      layout
-                      key={org.nonprofit_id} 
-                      className="relative border border-green-200 bg-green-50 p-6 rounded-2xl flex flex-col gap-4 shadow-sm hover:shadow-md transition"
-                    >
-                      <div className="flex flex-col md:flex-row justify-between items-start gap-4">
-                        <div>
-                          <h4 className="font-bold text-2xl text-green-950">{org.name}</h4>
-                          <p className="text-sm text-green-700 mt-1 uppercase tracking-wider font-semibold">{org.sector}</p>
-                          {org.enrichment_summary && (
-                            <p className="text-sm text-emerald-700 italic mt-2 border-l-2 border-emerald-400 pl-2">
-                              <span className="font-bold text-emerald-600">✨ AI Insight:</span> {org.enrichment_summary}
-                            </p>
-                          )}
+        <div className="space-y-6">
+          <Surface className="overflow-hidden px-6 py-6 sm:px-8">
+            <SectionHeading
+              eyebrow="Workspace overview"
+              title="Compare organizations with clearer operational context"
+              accent="Dashboard-first, still brand-aligned"
+              body="The core scoring and approval logic remain unchanged, but the interface now prioritizes scanability, focus management, and high-clarity decision support."
+            />
+
+            <div className="mt-8 flex flex-wrap items-center gap-3">
+              <TabButton active={activeTab === 'matches'} count={filteredMatches.length} onClick={() => { setActiveTab('matches'); setSelectedNonprofit(null) }}>
+                Top matches
+              </TabButton>
+              <TabButton active={activeTab === 'saved'} count={savedNonprofits.length} onClick={() => { setActiveTab('saved'); setSelectedNonprofit(null) }}>
+                Saved shortlist
+              </TabButton>
+            </div>
+          </Surface>
+
+          <AnimatePresence>
+            {selectedNonprofit && activeTab === 'matches' ? (
+              <MotionDiv
+                initial={{ opacity: 0, y: -14 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+              >
+                <Surface strong className="relative overflow-hidden px-6 py-6 sm:px-8">
+                  <div className="relative flex flex-col gap-5">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="eyebrow mb-3">Selected organization</p>
+                        <h3 className="font-cta text-3xl text-forest">{selectedNonprofit.name}</h3>
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          <Badge tone="grove">{selectedNonprofit.sector}</Badge>
+                          <Badge tone="sky">{selectedNonprofit.maturity}</Badge>
+                          <Badge>{selectedNonprofit.location}</Badge>
                         </div>
-                        <button 
-                          onClick={(e) => handleRemove(org.nonprofit_id, e)}
-                          className="bg-white hover:bg-red-50 text-red-500 hover:text-red-700 border border-red-200 hover:border-red-300 font-bold py-2 px-6 rounded-xl transition text-sm shadow-sm flex-shrink-0"
-                        >
-                          Remove
-                        </button>
                       </div>
+                      <button
+                        onClick={() => setSelectedNonprofit(null)}
+                        className="flex h-10 w-10 items-center justify-center rounded-full border border-forest/10 bg-white/70 text-forest transition hover:bg-white"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
 
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2 pt-4 border-t border-green-200/60">
+                    <p className="body-copy border-l-2 border-sun pl-4 text-lg">
+                      {selectedNonprofit.mission}
+                    </p>
+
+                    <div className="rounded-[1.6rem] bg-forest px-5 py-5 text-cream shadow-lift">
+                      <div className="mb-3 flex items-center gap-2">
+                        <Sparkles className="h-4 w-4 text-sun" />
+                        <p className="font-cta text-sm text-cream/82">AI explanation</p>
+                      </div>
+                      <p className="text-sm leading-7 text-cream/90">
+                        {loadingExplain ? 'Analyzing the overlap between your priorities and this organization’s profile...' : explanation || 'Request an explanation to see why this organization rises for the current weighting.'}
+                      </p>
+
+                      <div className="mt-6 grid gap-3 sm:grid-cols-2">
                         {[
-                          { label: 'Program Efficiency', value: org.program_efficiency },
-                          { label: 'Revenue Growth', value: org.revenue_growth },
-                          { label: 'Sustainability', value: org.sustainability },
-                          { label: 'Scale', value: org.scale },
-                          { label: 'Grant Distribution', value: org.grant_distribution },
-                          { label: 'Geographic Reach', value: org.geographic_reach },
-                          { label: 'Innovation Output', value: org.innovation_output }
-                        ].map(metric => (
-                          <div key={metric.label} className="bg-white p-4 rounded-xl border border-green-100 shadow-sm flex flex-col gap-1">
-                            <span className="text-[10px] sm:text-xs font-bold text-green-700 uppercase tracking-wider">{metric.label}</span>
-                            <span className="text-xl sm:text-2xl font-black text-green-900">
-                              {metric.value != null ? `${(metric.value * 50).toFixed(0)}/100` : '—'}
-                            </span>
+                          'Verify reported outcomes',
+                          'Review field reporting',
+                          'Check community voice signals',
+                          'Contextualize the financial data',
+                        ].map((item) => (
+                          <div key={item} className="rounded-2xl border border-white/10 bg-white/6 px-4 py-3 text-sm text-cream/85">
+                            {item}
                           </div>
                         ))}
                       </div>
-                    </motion.div>
+
+                      <div className="mt-6 flex flex-wrap gap-3">
+                        <Button onClick={() => handleApprove(selectedNonprofit)} className="bg-sun text-forest hover:bg-[#e7b22f]">
+                          Approve for outreach
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </Surface>
+              </MotionDiv>
+            ) : null}
+          </AnimatePresence>
+
+          {activeTab === 'matches' ? (
+            <Surface className="px-5 py-5 sm:px-6">
+              <div className="mb-5 flex items-center justify-between gap-4">
+                <div>
+                  <p className="eyebrow mb-2">Top matches</p>
+                  <h3 className="font-cta text-2xl text-forest">Organizations worth a closer look</h3>
+                </div>
+                <Badge tone="sun">{filteredMatches.length} available</Badge>
+              </div>
+
+              <div className="space-y-4">
+                {filteredMatches.length === 0 ? (
+                  <EmptyState
+                    icon={<Trees className="h-7 w-7" />}
+                    title="No new organizations match this lens"
+                    body="Try widening the sector, adjusting maturity, or easing one or two weight sliders to reopen the field."
+                  />
+                ) : (
+                  filteredMatches.map((org) => (
+                    <MotionButton
+                      key={org.id}
+                      layout
+                      onClick={() => handleExplain(org)}
+                      className={[
+                        'w-full rounded-[1.75rem] border px-5 py-5 text-left transition sm:px-6',
+                        selectedNonprofit?.id === org.id
+                          ? 'border-pine bg-pine/8 shadow-lift'
+                          : 'border-forest/8 bg-white/72 hover:-translate-y-0.5 hover:border-pine/28 hover:bg-white',
+                      ].join(' ')}
+                    >
+                      <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="max-w-2xl">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h4 className="font-cta text-2xl text-forest">{org.name}</h4>
+                            <Badge tone="grove">{org.sector}</Badge>
+                          </div>
+                          <p className="body-copy mt-3">{org.mission}</p>
+                          {org.enrichment_summary ? (
+                            <p className="mt-4 rounded-2xl border border-grove/15 bg-grove/6 px-4 py-3 text-sm leading-6 text-pine">
+                              <span className="font-cta">AI insight:</span> {org.enrichment_summary}
+                            </p>
+                          ) : null}
+                        </div>
+
+                        <div className="min-w-[210px] rounded-[1.5rem] bg-forest px-5 py-4 text-cream lg:max-w-[240px]">
+                          <p className="eyebrow mb-3 text-cream/70">Match score</p>
+                          <div className="mb-3 flex items-end gap-2">
+                            <span className="font-cta text-4xl">{org.score}</span>
+                            <span className="pb-1 text-sm text-cream/70">/100</span>
+                          </div>
+                          <div className="mb-4 h-2.5 overflow-hidden rounded-full bg-white/12">
+                            <motion.div
+                              initial={{ width: 0 }}
+                              animate={{ width: `${org.score}%` }}
+                              transition={{ duration: 0.65, ease: 'easeOut' }}
+                              className="h-full rounded-full bg-[linear-gradient(90deg,#f4c146,#2d915f)]"
+                            />
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-cream/76">
+                            <MapPin className="h-4 w-4" />
+                            {org.location}
+                          </div>
+                          <div className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-sun">
+                            Review details <ArrowRight className="h-4 w-4" />
+                          </div>
+                        </div>
+                      </div>
+                    </MotionButton>
                   ))
                 )}
               </div>
-            )}
-          </div>
+            </Surface>
+          ) : (
+            <Surface className="px-5 py-5 sm:px-6">
+              <div className="mb-5 flex items-center justify-between gap-4">
+                <div>
+                  <p className="eyebrow mb-2">Saved shortlist</p>
+                  <h3 className="font-cta text-2xl text-forest">Approved organizations for outreach</h3>
+                </div>
+                <Badge tone="sky">{savedNonprofits.length} approved</Badge>
+              </div>
 
+              <div className="space-y-4">
+                {savedNonprofits.length === 0 ? (
+                  <EmptyState
+                    icon={<Check className="h-7 w-7" />}
+                    title="Your shortlist is still open"
+                    body="Approve organizations from the discovery view to build an outreach-ready set of partners here."
+                  />
+                ) : (
+                  savedNonprofits.map((org) => (
+                    <MotionDiv key={org.nonprofit_id} layout className="rounded-[1.85rem] border border-forest/8 bg-white/76 px-5 py-5 shadow-soft sm:px-6">
+                      <div className="flex flex-col gap-5 lg:flex-row lg:justify-between">
+                        <div className="max-w-2xl">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h4 className="font-cta text-2xl text-forest">{org.name}</h4>
+                            <Badge tone="grove">{org.sector}</Badge>
+                          </div>
+                          <p className="body-copy mt-3">{org.mission}</p>
+                          {org.enrichment_summary ? (
+                            <p className="mt-4 rounded-2xl border border-sky/20 bg-sky/8 px-4 py-3 text-sm leading-6 text-forest/80">
+                              <span className="font-cta">AI insight:</span> {org.enrichment_summary}
+                            </p>
+                          ) : null}
+                        </div>
+
+                        <div className="flex flex-col gap-3">
+                          <Button variant="secondary" onClick={(event) => handleRemove(org.nonprofit_id, org.name, event)}>
+                            Remove from shortlist
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                        {metricFields.map(([key, label]) => (
+                          <div key={key} className="rounded-[1.4rem] border border-forest/8 bg-cream/68 px-4 py-4">
+                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-forest/50">{label}</p>
+                            <p className="mt-3 font-cta text-3xl text-forest">
+                              {org[key] != null ? `${(org[key] * 50).toFixed(0)}` : '—'}
+                            </p>
+                            <p className="text-xs text-forest/48">out of 100</p>
+                          </div>
+                        ))}
+                      </div>
+                    </MotionDiv>
+                  ))
+                )}
+              </div>
+            </Surface>
+          )}
         </div>
-      </div>
+      </section>
+
+      <AnimatePresence>
+        {toast ? (
+          <MotionDiv
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 12 }}
+            className="fixed bottom-5 right-5 z-50 max-w-sm rounded-[1.4rem] border border-forest/10 bg-white px-5 py-4 shadow-lift"
+          >
+            <div className="flex items-start gap-3">
+              <div className={`mt-1 h-2.5 w-2.5 rounded-full ${toast.kind === 'error' ? 'bg-ember' : 'bg-grove'}`} />
+              <div>
+                <p className="font-cta text-sm text-forest">{toast.kind === 'error' ? 'Something needs attention' : 'Shortlist updated'}</p>
+                <p className="mt-1 text-sm leading-6 text-forest/72">{toast.message}</p>
+              </div>
+            </div>
+          </MotionDiv>
+        ) : null}
+      </AnimatePresence>
     </div>
-  );
+  )
 }

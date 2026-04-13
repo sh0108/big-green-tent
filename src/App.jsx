@@ -2,6 +2,7 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import DiscoveryPage from './pages/DiscoveryPage'
 import AdminPage from './pages/AdminPage'
+import AppShell from './components/AppShell'
 
 const pageVariants = {
   initial: { opacity: 0, y: 8 },
@@ -10,8 +11,10 @@ const pageVariants = {
 }
 
 function PageTransition({ children }) {
+  const MotionDiv = motion.div
+
   return (
-    <motion.div
+    <MotionDiv
       variants={pageVariants}
       initial="initial"
       animate="animate"
@@ -19,7 +22,7 @@ function PageTransition({ children }) {
       transition={{ type: 'spring', stiffness: 120, damping: 18 }}
     >
       {children}
-    </motion.div>
+    </MotionDiv>
   )
 }
 
@@ -28,27 +31,29 @@ function App() {
 
   return (
     <div className="app-shell font-body">
-      <AnimatePresence mode="wait">
-        <Routes location={location} key={location.pathname}>
-          <Route
-            path="/"
-            element={
-              <PageTransition>
-                <DiscoveryPage />
-              </PageTransition>
-            }
-          />
-          <Route
-            path="/admin"
-            element={
-              <PageTransition>
-                <AdminPage />
-              </PageTransition>
-            }
-          />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </AnimatePresence>
+      <AppShell>
+        <AnimatePresence mode="wait">
+          <Routes location={location} key={location.pathname}>
+            <Route
+              path="/"
+              element={
+                <PageTransition>
+                  <DiscoveryPage />
+                </PageTransition>
+              }
+            />
+            <Route
+              path="/admin"
+              element={
+                <PageTransition>
+                  <AdminPage />
+                </PageTransition>
+              }
+            />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </AnimatePresence>
+      </AppShell>
     </div>
   )
 }
