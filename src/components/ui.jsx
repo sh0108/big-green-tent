@@ -54,7 +54,7 @@ export function TabButton({ active, count, children, ...props }) {
 
 export function FieldLabel({ title, detail }) {
   return (
-    <div className="mb-2 flex items-end justify-between gap-3">
+    <div className="mb-2 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between sm:gap-3">
       <label className="font-cta text-sm text-forest">{title}</label>
       {detail ? <span className="text-xs text-forest/50">{detail}</span> : null}
     </div>

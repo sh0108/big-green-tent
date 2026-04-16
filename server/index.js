@@ -26,7 +26,7 @@ if (!apiKey) {
 }
 
 const app = express()
-const PORT = 8000
+const PORT = Number(process.env.PORT || 8000)
 const tmpDir = path.resolve('server', 'tmp')
 
 await fs.mkdir(tmpDir, { recursive: true })
@@ -38,6 +38,10 @@ const upload = multer({
 
 app.use(express.json({ limit: '1mb' }))
 app.use(express.static(path.join(__dirname, '../dist')))
+
+app.get('/healthz', (req, res) => {
+  res.json({ ok: true })
+})
 
 app.get('/api/nonprofits', (req, res) => {
   const { sector, maturity, efficiency, growth, sustainability, scale } = req.query;

@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom'
+import { LogOut, ShieldCheck } from 'lucide-react'
 
 const navItems = [
   { to: '/', label: 'Discovery' },
@@ -16,29 +17,40 @@ export default function AppShell({ children }) {
   return (
     <div className="brand-shell page-noise">
       <div className="page-wrap">
-        <header className="brand-card mb-8 flex flex-col gap-5 px-5 py-5 sm:px-7 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-center gap-4">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-forest shadow-lift">
-              <img src="/brand/BGT-Tent_Icon_Forest.svg" alt="" className="h-7 w-7 invert" />
+        <header className="brand-card mb-8 flex flex-col gap-4 px-5 py-5 sm:px-7 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 items-center gap-4">
+            <div className="flex h-16 w-16 items-center justify-center rounded-[1.25rem] bg-white/75 shadow-soft">
+              <img src="/brand/BGT-Tent_Icon_Forest.svg" alt="Big Green Tent logo" className="h-10 w-10" />
             </div>
-            <div>
-              <p className="eyebrow mb-2">Big Green Tent</p>
-              <h1 className="font-cta text-lg text-forest">Environmental discovery and outreach</h1>
-              <p className="mt-1 text-sm text-forest/58">Internal dashboard for nonprofit evaluation, shortlisting, and outreach coordination</p>
+            <div className="min-w-0">
+              <div className="font-cta text-[clamp(1.75rem,3vw,2.4rem)] leading-none text-forest">
+                Big Green Tent
+              </div>
+              <h1 className="mt-2 min-w-0 font-cta text-base text-forest/82 sm:text-lg">Reviewer workspace</h1>
             </div>
           </div>
 
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-            <nav className="flex flex-wrap gap-2">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
+            <nav className="flex flex-wrap gap-2" aria-label="Primary">
               {navItems.map((item) => (
                 <NavLink key={item.to} to={item.to} className={linkClassName}>
                   {item.label}
                 </NavLink>
               ))}
             </nav>
-            <div className="stat-pill">
-              <span className="h-2 w-2 rounded-full bg-grove" />
-              Mission-led prototype
+
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="stat-pill whitespace-nowrap">
+                <ShieldCheck className="h-3.5 w-3.5 text-grove" />
+                Reviewer access
+              </div>
+              <div className="rounded-full border border-forest/10 bg-white/72 px-4 py-2 text-sm text-forest/72 whitespace-nowrap">
+                Alex Morgan
+              </div>
+              <button className="brand-button-secondary px-4 py-2 whitespace-nowrap" type="button" aria-label="Log out">
+                <LogOut className="mr-2 h-4 w-4" />
+                Log out
+              </button>
             </div>
           </div>
         </header>

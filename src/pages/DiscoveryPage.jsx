@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowRight, Check, Leaf, MapPin, Sparkles, Trees, X } from 'lucide-react'
+import { ArrowRight, Check, ExternalLink, Leaf, MapPin, Sparkles, Trees, X } from 'lucide-react'
 import { Badge, Button, EmptyState, FieldLabel, SectionHeading, Surface, TabButton } from '../components/ui'
 
 const sectorOptions = [
@@ -41,6 +41,45 @@ const metricFields = [
   ['grant_distribution', 'Grant reach'],
   ['geographic_reach', 'Footprint'],
   ['innovation_output', 'Innovation'],
+]
+
+const dueDiligenceSteps = [
+  {
+    key: 'programOutcomes',
+    title: 'Verify Program Outcomes',
+    description: 'AI flagged likely impact claims in the organization materials. Confirm those claims against project pages or an annual report before approval.',
+    getSource: (org) => ({
+      label: 'View Source Document',
+      href: `https://www.google.com/search?q=${encodeURIComponent(`${org.name} annual report projects`)}`,
+    }),
+  },
+  {
+    key: 'fieldReports',
+    title: 'Review Field Reports',
+    description: 'Check how the organization is described outside its own materials. Look for reporting, watchdog context, or recent public-facing updates.',
+    getSource: (org) => ({
+      label: 'View Source Document',
+      href: `https://www.google.com/search?q=${encodeURIComponent(`${org.name} news candid nonprofit`)}`,
+    }),
+  },
+  {
+    key: 'communityEngagement',
+    title: 'Assess Community Engagement',
+    description: 'Review signs of local accountability, leadership visibility, and community presence that may not appear in high-level summaries alone.',
+    getSource: (org) => ({
+      label: 'View Source Document',
+      href: `https://www.google.com/search?q=${encodeURIComponent(`${org.name} team board community`)}`,
+    }),
+  },
+  {
+    key: 'financialData',
+    title: 'Contextualize Financial Data',
+    description: 'Cross-check the organization’s financial profile with independent filings so budget size, scale, and giving posture are grounded in source data.',
+    getSource: (org) => ({
+      label: 'View Source Document',
+      href: `https://projects.propublica.org/nonprofits/search?utf8=%E2%9C%93&q=${encodeURIComponent(org.name)}`,
+    }),
+  },
 ]
 
 function getWeightTemperature(value) {
@@ -244,7 +283,7 @@ export default function DiscoveryPage() {
           <div className="space-y-5">
             <div>
               <FieldLabel title="Environmental sector" detail="Choose a thematic focus" />
-              <select value={sector} onChange={(event) => setSector(event.target.value)} className="brand-input">
+              <select value={sector} onChange={(event) => setSector(event.target.value)} className="brand-input brand-select">
                 {sectorOptions.map((option) => (
                   <option key={option} value={option}>
                     {option === 'All' ? 'All sectors' : option}
@@ -255,7 +294,7 @@ export default function DiscoveryPage() {
 
             <div>
               <FieldLabel title="Organization maturity" detail="Filter by lifecycle stage" />
-              <select value={maturity} onChange={(event) => setMaturity(event.target.value)} className="brand-input">
+              <select value={maturity} onChange={(event) => setMaturity(event.target.value)} className="brand-input brand-select">
                 {maturityOptions.map((option) => (
                   <option key={option} value={option}>
                     {option === 'All' ? 'All stages' : option}
@@ -351,23 +390,64 @@ export default function DiscoveryPage() {
                         {loadingExplain ? 'Analyzing the overlap between your priorities and this organization’s profile...' : explanation || 'Request an explanation to see why this organization rises for the current weighting.'}
                       </p>
 
-                      <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                        {[
-                          'Verify reported outcomes',
-                          'Review field reporting',
-                          'Check community voice signals',
-                          'Contextualize the financial data',
-                        ].map((item) => (
-                          <div key={item} className="rounded-2xl border border-white/10 bg-white/6 px-4 py-3 text-sm text-cream/85">
-                            {item}
+                      <div className="mt-6">
+                        <div className="mb-4">
+                          <div>
+                            <p className="font-cta text-sm uppercase tracking-[0.18em] text-cream/74">Human evaluation reminders</p>
+                            <p className="mt-2 text-sm leading-6 text-cream/78">
+                              Use these checkpoints as a quick due-diligence reminder before approving the organization for outreach.
+                            </p>
                           </div>
-                        ))}
+                        </div>
+
+                        <div className="space-y-3">
+                          {dueDiligenceSteps.map((step, index) => {
+                            const source = step.getSource(selectedNonprofit)
+
+                            return (
+                              <div
+                                key={step.key}
+                                className="rounded-[1.35rem] border border-white/12 bg-white/6 px-4 py-4 transition"
+                              >
+                                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                                  <div className="max-w-3xl">
+                                    <div className="flex flex-wrap items-center gap-3">
+                                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-sm font-semibold text-cream">
+                                        {index + 1}
+                                      </div>
+                                      <h4 className="font-cta text-lg text-cream">{step.title}</h4>
+                                      <span className="rounded-full bg-white/10 px-2.5 py-1 text-xs font-semibold text-cream/74">
+                                        Recommended review
+                                      </span>
+                                    </div>
+                                    <p className="mt-3 text-sm leading-6 text-cream/82">{step.description}</p>
+                                  </div>
+
+                                  <div className="flex flex-col gap-2 sm:flex-row lg:flex-col">
+                                    <a
+                                      href={source.href}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="brand-button-secondary border-sun/35 bg-sun/18 px-4 py-2 text-cream hover:border-sun/55 hover:bg-sun/32 hover:text-cream"
+                                    >
+                                      {source.label}
+                                      <ExternalLink className="ml-2 h-4 w-4" />
+                                    </a>
+                                  </div>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
                       </div>
 
                       <div className="mt-6 flex flex-wrap gap-3">
                         <Button onClick={() => handleApprove(selectedNonprofit)} className="bg-sun text-forest hover:bg-[#e7b22f]">
                           Approve for outreach
                         </Button>
+                        <p className="self-center text-sm text-cream/74">
+                          Review these reminders as needed, then approve when you’re comfortable moving forward.
+                        </p>
                       </div>
                     </div>
                   </div>

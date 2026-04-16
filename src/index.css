@@ -131,6 +131,16 @@ body {
     @apply rounded-[1.35rem] px-4 py-3 text-sm outline-none transition duration-200;
   }
 
+  .brand-select {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23231f20' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-position: calc(100% - 1.15rem) center;
+    background-repeat: no-repeat;
+    background-size: 1rem;
+    padding-left: 1rem;
+    padding-right: 3rem;
+  }
+
   .brand-input::placeholder {
     color: rgba(35, 31, 32, 0.35);
   }
@@ -138,6 +148,10 @@ body {
   .brand-input:focus {
     border-color: rgba(26, 114, 82, 0.5);
     box-shadow: 0 0 0 4px rgba(26, 114, 82, 0.12);
+  }
+
+  .brand-select::-ms-expand {
+    display: none;
   }
 
   .brand-button {
@@ -164,6 +178,14 @@ body {
     background: var(--pine);
   }
 
+  .brand-button-primary:disabled {
+    background: rgba(244, 193, 70, 0.52);
+    box-shadow: none;
+    color: rgba(13, 48, 35, 0.72);
+    cursor: not-allowed;
+    transform: none;
+  }
+
   .brand-button-secondary {
     @apply brand-button;
     background: rgba(255, 255, 255, 0.7);
@@ -174,6 +196,13 @@ body {
   .brand-button-secondary:hover {
     background: rgba(255, 255, 255, 0.95);
     border-color: rgba(26, 114, 82, 0.3);
+  }
+
+  .brand-button-secondary:disabled {
+    background: rgba(255, 255, 255, 0.45);
+    border-color: rgba(255, 255, 255, 0.12);
+    color: rgba(246, 240, 229, 0.48);
+    cursor: not-allowed;
   }
 
   .stat-pill {

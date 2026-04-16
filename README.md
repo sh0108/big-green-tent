@@ -72,3 +72,36 @@ Big Green Tent uses a **Grand Reset** architecture for development. To apply maj
 2. Delete `server/big_green_tent.db`.
 3. Restart the server.
 4. Re-run the `data-pipeline/ingest_ollama.py` script to repopulate data.
+
+## Temporary Deployment
+If you want to share the current prototype before it is finished, the simplest path is to deploy it as a single Node web service. The Express server already serves the built Vite app from `dist/`.
+
+### Recommended Setup
+- Host type: Node web service
+- Build command: `npm install && npm run build`
+- Start command: `npm start`
+- Health check path: `/healthz`
+
+### Environment Variables
+- `OPENAI_QUIZ_API_KEY`
+  - Optional for a review build, but required if you want the AI explanation endpoint to work.
+- `PORT`
+  - Usually set automatically by the host.
+- `DATABASE_PATH`
+  - Optional override for where the SQLite file should live in production.
+
+### Render Example
+Render’s web service docs say your app must bind to `0.0.0.0` on the platform-provided port, and that you can configure build/start commands, environment variables, health checks, and an optional persistent disk in the dashboard:
+- https://render.com/docs/web-services
+
+Suggested Render settings:
+- Service type: `Web Service`
+- Environment: `Node`
+- Branch: your working branch or `main`
+- Build Command: `npm install && npm run build`
+- Start Command: `npm start`
+- Health Check Path: `/healthz`
+
+Important note for this repo:
+- The app uses SQLite. If you only need a temporary review deployment, the checked-in database can be enough to demo the app.
+- If you want shortlist changes to persist across deploys/restarts, use a persistent disk on your host and point `DATABASE_PATH` at that mounted location.
