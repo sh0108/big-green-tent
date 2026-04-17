@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import DiscoveryPage from './pages/DiscoveryPage'
 import AdminPage from './pages/AdminPage'
+import PersonalizePage from './pages/PersonalizePage'
 import AppShell from './components/AppShell'
 
 function App() {
@@ -12,6 +13,7 @@ function App() {
         <Routes location={location}>
           <Route path="/" element={<DiscoveryPage />} />
           <Route path="/admin" element={<AdminPage />} />
+          <Route path="/admin/personalize" element={<PersonalizePage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AppShell>

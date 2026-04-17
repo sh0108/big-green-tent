@@ -11,8 +11,8 @@ export function SectionHeading({ eyebrow, title, accent, body, align = 'left' })
   )
 }
 
-export function Surface({ children, className = '', strong = false }) {
-  return <section className={`${strong ? 'brand-card-strong' : 'brand-card'} ${className}`}>{children}</section>
+export function Surface({ children, className = '', strong = false, ...rest }) {
+  return <section className={`${strong ? 'brand-card-strong' : 'brand-card'} ${className}`} {...rest}>{children}</section>
 }
 
 export function Button({ children, className = '', variant = 'primary', ...props }) {

@@ -26,7 +26,7 @@ export default function AppShell({ children }) {
               <div className="font-cta text-[clamp(1.75rem,3vw,2.4rem)] leading-none text-forest">
                 Big Green Tent
               </div>
-              <h1 className="mt-2 min-w-0 font-cta text-base text-forest/82 sm:text-lg">Reviewer workspace</h1>
+              <h1 className="mt-2 min-w-0 font-cta text-base text-forest/82 sm:text-lg">Reviewer Workspace</h1>
             </div>
           </div>
 
@@ -42,14 +42,14 @@ export default function AppShell({ children }) {
             <div className="flex flex-wrap items-center gap-3">
               <div className="stat-pill whitespace-nowrap">
                 <ShieldCheck className="h-3.5 w-3.5 text-grove" />
-                Reviewer access
+                Reviewer Access
               </div>
               <div className="rounded-full border border-forest/10 bg-white/72 px-4 py-2 text-sm text-forest/72 whitespace-nowrap">
                 Alex Morgan
               </div>
               <button className="brand-button-secondary px-4 py-2 whitespace-nowrap" type="button" aria-label="Log out">
                 <LogOut className="mr-2 h-4 w-4" />
-                Log out
+                Log Out
               </button>
             </div>
           </div>

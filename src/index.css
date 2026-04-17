@@ -289,6 +289,38 @@ body {
   }
 }
 
+/* ── Print / PDF export ──────────────────────────────────────────────────── */
+#bgt-print-area {
+  display: none;
+}
+
+@media print {
+  /* Hide the entire app shell */
+  body > *:not(#bgt-print-area) {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  body {
+    background: #fff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  #bgt-print-area {
+    display: block !important;
+    visibility: visible !important;
+    position: static !important;
+    width: 100% !important;
+    height: auto !important;
+  }
+
+  @page {
+    margin: 18mm 20mm;
+    size: A4 portrait;
+  }
+}
+
 @media (max-width: 768px) {
   .brand-shell::before {
     background-size: 26rem;

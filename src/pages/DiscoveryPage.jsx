@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowRight, Check, ExternalLink, Leaf, MapPin, Sparkles, Trees, X } from 'lucide-react'
-import { Badge, Button, EmptyState, FieldLabel, SectionHeading, Surface, TabButton } from '../components/ui'
+import { ArrowRight, Check, ExternalLink, Gauge, Layers, ListChecks, MapPin, RotateCcw, Sparkles, Target, Trees, X } from 'lucide-react'
+import { Badge, Button, EmptyState, FieldLabel, Surface, TabButton } from '../components/ui'
+import DiscoveryMap from '../components/DiscoveryMap'
 
 const sectorOptions = [
   'All',
@@ -24,13 +25,13 @@ const sectorOptions = [
 const maturityOptions = ['All', 'Emerging', 'Established', 'Mature']
 
 const weightFields = [
-  ['efficiency', 'Program efficiency'],
-  ['growth', 'Revenue growth'],
+  ['efficiency', 'Program Efficiency'],
+  ['growth', 'Revenue Growth'],
   ['sustainability', 'Sustainability'],
   ['scale', 'Scale'],
-  ['grant_distribution', 'Grant distribution'],
-  ['geographic_reach', 'Geographic reach'],
-  ['innovation_output', 'Innovation output'],
+  ['grant_distribution', 'Grant Distribution'],
+  ['geographic_reach', 'Geographic Reach'],
+  ['innovation_output', 'Innovation Output'],
 ]
 
 const metricFields = [
@@ -38,7 +39,7 @@ const metricFields = [
   ['revenue_growth', 'Growth'],
   ['sustainability', 'Sustainability'],
   ['scale', 'Scale'],
-  ['grant_distribution', 'Grant reach'],
+  ['grant_distribution', 'Grant Reach'],
   ['geographic_reach', 'Footprint'],
   ['innovation_output', 'Innovation'],
 ]
@@ -81,6 +82,47 @@ const dueDiligenceSteps = [
     }),
   },
 ]
+
+function HeroStat({ icon, label, value, sub, accent }) {
+  const iconClass = accent === 'sun' ? 'bg-sun text-forest' : 'bg-white/12 text-cream'
+  return (
+    <div className="flex items-center gap-3 rounded-[1.25rem] border border-white/12 bg-white/8 px-4 py-3">
+      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${iconClass}`}>
+        {icon}
+      </div>
+      <div className="min-w-0">
+        <p className="text-[0.7rem] uppercase tracking-[0.16em] text-cream/60">{label}</p>
+        <p className="truncate font-cta text-lg text-cream">{value}</p>
+        {sub ? <p className="text-xs text-cream/60">{sub}</p> : null}
+      </div>
+    </div>
+  )
+}
+
+function HeroStep({ step, title, body, cta, onClick, disabled = false }) {
+  return (
+    <div className="flex flex-col justify-between gap-3 rounded-[1.3rem] border border-white/12 bg-white/8 px-4 py-4">
+      <div>
+        <div className="mb-2 flex items-center gap-2">
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-sun text-[0.7rem] font-semibold text-forest">
+            {step}
+          </span>
+          <p className="font-cta text-sm text-cream">{title}</p>
+        </div>
+        <p className="text-sm leading-6 text-cream/74">{body}</p>
+      </div>
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={disabled}
+        className="inline-flex items-center gap-1.5 self-start text-sm font-semibold text-sun transition hover:text-amber-200 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {cta}
+        <ArrowRight className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  )
+}
 
 function getWeightTemperature(value) {
   if (value >= 1.6) return 'High'
@@ -216,102 +258,205 @@ export default function DiscoveryPage() {
   const filteredMatches = results.filter((org) => !savedIds.has(org.id))
   const highlightedResult = filteredMatches[0]
 
+  const mapOrgs = useMemo(() => {
+    const byId = new Map()
+    results.forEach((o) => byId.set(o.id, o))
+    savedNonprofits.forEach((s) => {
+      const id = s.nonprofit_id ?? s.id
+      if (!byId.has(id)) byId.set(id, { ...s, id })
+    })
+    return Array.from(byId.values())
+  }, [results, savedNonprofits])
+
+  const defaultWeights = {
+    efficiency: 1, growth: 1, sustainability: 1, scale: 1,
+    grant_distribution: 1, geographic_reach: 1, innovation_output: 1,
+  }
+  const filtersActive = sector !== 'All' || maturity !== 'All' ||
+    Object.keys(defaultWeights).some((k) => weights[k] !== defaultWeights[k])
+
+  const matchStats = useMemo(() => {
+    if (!filteredMatches.length) return null
+    const scores = filteredMatches.map((o) => Number(o.score) || 0)
+    const avg = Math.round(scores.reduce((s, v) => s + v, 0) / scores.length)
+    const sectorCounts = filteredMatches.reduce((acc, o) => {
+      if (!o.sector) return acc
+      acc[o.sector] = (acc[o.sector] || 0) + 1
+      return acc
+    }, {})
+    const topSector = Object.entries(sectorCounts).sort((a, b) => b[1] - a[1])[0]
+    return {
+      avg,
+      topSector: topSector ? { name: topSector[0], count: topSector[1] } : null,
+    }
+  }, [filteredMatches])
+
+  const resetFilters = () => {
+    setSector('All')
+    setMaturity('All')
+    setWeights(defaultWeights)
+  }
+
   return (
     <div className="relative flex flex-col gap-8">
-      <Surface strong className="dashboard-tent hero-marks relative overflow-hidden px-6 py-6 text-cream sm:px-8">
-        <div className="relative z-10 grid gap-6 lg:grid-cols-[minmax(0,1.35fr),320px] lg:items-start">
-          <div className="max-w-3xl">
-            <p className="eyebrow mb-3 text-cream/72">Discovery dashboard</p>
-            <h1 className="font-cta text-[clamp(2rem,5vw,3.4rem)] leading-tight text-cream">
-              Internal workspace for evaluating and shortlisting environmental nonprofits
-            </h1>
-            <p className="mt-4 max-w-2xl text-base leading-7 text-cream/84">
-              Compare vetted organizations, tune scoring priorities, generate AI explanations, and move promising groups into the outreach pipeline with accessible, task-first controls.
+      <Surface strong className="dashboard-tent hero-marks relative overflow-hidden px-5 py-5 text-cream sm:px-7 sm:py-6">
+        <div className="relative z-10 flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+          <div className="max-w-2xl">
+            <p className="eyebrow mb-2 text-cream/72">Discovery</p>
+            <h1 className="font-cta text-3xl text-cream sm:text-4xl">Evaluate & shortlist nonprofits</h1>
+            <p className="mt-2 text-sm leading-6 text-cream/78">
+              {filteredMatches.length
+                ? `${filteredMatches.length} matches under current filters · ${savedNonprofits.length} on shortlist`
+                : 'Adjust filters to surface candidates.'}
             </p>
-
-            <div className="mt-6 grid gap-3 sm:grid-cols-3">
-              <div className="rounded-[1.4rem] border border-white/12 bg-white/8 px-4 py-4">
-                <p className="text-xs uppercase tracking-[0.18em] text-cream/62">Available matches</p>
-                <p className="mt-2 font-cta text-3xl text-cream">{filteredMatches.length}</p>
-              </div>
-              <div className="rounded-[1.4rem] border border-white/12 bg-white/8 px-4 py-4">
-                <p className="text-xs uppercase tracking-[0.18em] text-cream/62">Saved shortlist</p>
-                <p className="mt-2 font-cta text-3xl text-cream">{savedNonprofits.length}</p>
-              </div>
-              <div className="rounded-[1.4rem] border border-white/12 bg-white/8 px-4 py-4">
-                <p className="text-xs uppercase tracking-[0.18em] text-cream/62">Current sector</p>
-                <p className="mt-2 font-cta text-lg text-cream">{sector === 'All' ? 'All sectors' : sector}</p>
-              </div>
-            </div>
           </div>
 
-          <div className="rounded-[1.7rem] border border-white/12 bg-white/8 px-5 py-5">
-            <p className="eyebrow mb-3 text-cream/70">Queue snapshot</p>
-            <div className="space-y-4">
-              <div>
-                <p className="text-xs uppercase tracking-[0.18em] text-cream/58">Top current match</p>
-                <p className="mt-2 font-cta text-xl text-cream">{highlightedResult?.name || 'No active match'}</p>
-              </div>
-              <div>
-                <p className="text-xs uppercase tracking-[0.18em] text-cream/58">AI review status</p>
-                <div className="mt-2 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-sm text-cream/84">
-                  <Sparkles className="h-4 w-4 text-sun" />
-                  Ready on demand
-                </div>
-              </div>
-              <div>
-                <p className="text-xs uppercase tracking-[0.18em] text-cream/58">Primary workflow</p>
-                <p className="mt-2 text-sm leading-6 text-cream/78">Filter, compare, explain, approve, then transition to outreach.</p>
-              </div>
-            </div>
+          <div className="flex flex-wrap gap-2 lg:justify-end">
+            <button
+              type="button"
+              onClick={resetFilters}
+              disabled={!filtersActive}
+              className="inline-flex items-center gap-2 rounded-full border border-white/18 bg-white/10 px-4 py-2 text-sm font-semibold text-cream transition hover:bg-white/18 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <RotateCcw className="h-4 w-4" />
+              Reset filters
+            </button>
+            {savedNonprofits.length ? (
+              <button
+                type="button"
+                onClick={() => { setActiveTab('saved'); setSelectedNonprofit(null) }}
+                className="inline-flex items-center gap-2 rounded-full bg-sun px-4 py-2 text-sm font-semibold text-forest transition hover:bg-amber-300"
+              >
+                <ListChecks className="h-4 w-4" />
+                View shortlist ({savedNonprofits.length})
+              </button>
+            ) : null}
           </div>
+        </div>
+
+        <div className="relative z-10 mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <HeroStat
+            icon={<Target className="h-4 w-4" />}
+            label="Matches"
+            value={filteredMatches.length}
+            accent="sun"
+          />
+          <HeroStat
+            icon={<Gauge className="h-4 w-4" />}
+            label="Avg score"
+            value={matchStats ? `${matchStats.avg}` : '—'}
+            sub={matchStats ? 'out of 100' : null}
+          />
+          <HeroStat
+            icon={<Layers className="h-4 w-4" />}
+            label="Top sector"
+            value={matchStats?.topSector ? matchStats.topSector.name : 'All sectors'}
+            sub={matchStats?.topSector ? `${matchStats.topSector.count} orgs` : null}
+          />
+          <HeroStat
+            icon={<Sparkles className="h-4 w-4" />}
+            label="Top match"
+            value={highlightedResult?.name || 'None'}
+            sub={highlightedResult ? `Score ${highlightedResult.score}` : null}
+          />
+        </div>
+
+        <div className="relative z-10 mt-5 flex items-center gap-3">
+          <span className="h-px flex-1 bg-white/14" />
+          <span className="text-[0.7rem] uppercase tracking-[0.18em] text-cream/58">Next steps</span>
+          <span className="h-px flex-1 bg-white/14" />
+        </div>
+
+        <div className="relative z-10 mt-4 grid gap-3 md:grid-cols-3">
+          <HeroStep
+            step="1"
+            title="Explain the top match"
+            body={highlightedResult ? `Score an AI summary for ${highlightedResult.name}.` : 'Surface a match to enable.'}
+            cta="Generate explanation"
+            onClick={() => highlightedResult && handleExplain(highlightedResult)}
+            disabled={!highlightedResult}
+          />
+          <HeroStep
+            step="2"
+            title="Review the shortlist"
+            body={savedNonprofits.length ? `${savedNonprofits.length} approved ${savedNonprofits.length === 1 ? 'org' : 'orgs'} ready for outreach.` : 'Approve orgs to build your shortlist.'}
+            cta="Open shortlist"
+            onClick={() => { setActiveTab('saved'); setSelectedNonprofit(null) }}
+            disabled={!savedNonprofits.length}
+          />
+          <HeroStep
+            step="3"
+            title={filtersActive ? 'Widen the lens' : 'Tune the lens'}
+            body={filtersActive ? 'Reset filters to see the full field.' : 'Adjust sector, maturity, or weights in the sidebar.'}
+            cta={filtersActive ? 'Reset filters' : 'Focus sidebar'}
+            onClick={() => {
+              if (filtersActive) return resetFilters()
+              document.getElementById('discovery-filters')?.scrollIntoView({ behavior: 'smooth' })
+            }}
+          />
         </div>
       </Surface>
 
-      <section className="grid gap-6 xl:grid-cols-[340px,minmax(0,1fr)]">
-        <Surface className="h-fit px-5 py-6 sm:px-6">
-          <div className="mb-6">
-            <p className="eyebrow mb-3">Stewardship settings</p>
-            <h2 className="font-cta text-2xl text-forest">Shape the discovery lens</h2>
-            <p className="body-copy mt-3 text-sm">
-              Tune for organizations that match your goals, maturity preferences, and impact priorities without changing the underlying scoring engine.
-            </p>
-          </div>
+      <DiscoveryMap
+        orgs={mapOrgs}
+        approvedIds={savedIds}
+        onSelectOrg={(org) => {
+          setActiveTab('matches')
+          handleExplain(org)
+        }}
+      />
 
-          <div className="brand-divider mb-6" />
+      <section id="discovery-filters" className="grid gap-6 xl:grid-cols-[340px,minmax(0,1fr)]">
+        <Surface className="h-fit px-5 py-5 sm:px-6">
+          <div className="mb-5 flex items-center justify-between gap-3">
+            <div>
+              <p className="eyebrow mb-1">Filters</p>
+              <h2 className="font-cta text-xl text-forest">Shape the lens</h2>
+            </div>
+            {filtersActive ? (
+              <button
+                type="button"
+                onClick={resetFilters}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-pine hover:text-forest"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                Reset
+              </button>
+            ) : null}
+          </div>
 
           <div className="space-y-5">
             <div>
-              <FieldLabel title="Environmental sector" detail="Choose a thematic focus" />
+              <FieldLabel title="Environmental Sector" detail="Choose A Thematic Focus" />
               <select value={sector} onChange={(event) => setSector(event.target.value)} className="brand-input brand-select">
                 {sectorOptions.map((option) => (
                   <option key={option} value={option}>
-                    {option === 'All' ? 'All sectors' : option}
+                    {option === 'All' ? 'All Sectors' : option}
                   </option>
                 ))}
               </select>
             </div>
 
             <div>
-              <FieldLabel title="Organization maturity" detail="Filter by lifecycle stage" />
+              <FieldLabel title="Organization Maturity" detail="Filter By Lifecycle Stage" />
               <select value={maturity} onChange={(event) => setMaturity(event.target.value)} className="brand-input brand-select">
                 {maturityOptions.map((option) => (
                   <option key={option} value={option}>
-                    {option === 'All' ? 'All stages' : option}
+                    {option === 'All' ? 'All Stages' : option}
                   </option>
                 ))}
               </select>
             </div>
 
             <Surface className="soft-grid px-4 py-4">
-              <p className="eyebrow mb-4">Impact weighting</p>
+              <p className="eyebrow mb-4">Impact Weighting</p>
               <div className="space-y-4">
                 {weightFields.map(([key, label]) => (
                   <div key={key}>
                     <div className="mb-2 flex items-center justify-between gap-3">
                       <div>
                         <p className="font-cta text-sm capitalize text-forest">{label}</p>
-                        <p className="text-xs text-forest/48">{getWeightTemperature(weights[key])} emphasis</p>
+                        <p className="text-xs text-forest/48">{getWeightTemperature(weights[key])} Emphasis</p>
                       </div>
                       <span className="rounded-full bg-forest/6 px-2.5 py-1 text-xs font-semibold text-forest">{weights[key].toFixed(1)}</span>
                     </div>
@@ -332,23 +477,14 @@ export default function DiscoveryPage() {
         </Surface>
 
         <div className="space-y-6">
-          <Surface className="overflow-hidden px-6 py-6 sm:px-8">
-            <SectionHeading
-              eyebrow="Workspace overview"
-              title="Compare organizations with clearer operational context"
-              accent="Dashboard-first, still brand-aligned"
-              body="The core scoring and approval logic remain unchanged, but the interface now prioritizes scanability, focus management, and high-clarity decision support."
-            />
-
-            <div className="mt-8 flex flex-wrap items-center gap-3">
-              <TabButton active={activeTab === 'matches'} count={filteredMatches.length} onClick={() => { setActiveTab('matches'); setSelectedNonprofit(null) }}>
-                Top matches
-              </TabButton>
-              <TabButton active={activeTab === 'saved'} count={savedNonprofits.length} onClick={() => { setActiveTab('saved'); setSelectedNonprofit(null) }}>
-                Saved shortlist
-              </TabButton>
-            </div>
-          </Surface>
+          <div className="flex flex-wrap items-center gap-2">
+            <TabButton active={activeTab === 'matches'} count={filteredMatches.length} onClick={() => { setActiveTab('matches'); setSelectedNonprofit(null) }}>
+              Top Matches
+            </TabButton>
+            <TabButton active={activeTab === 'saved'} count={savedNonprofits.length} onClick={() => { setActiveTab('saved'); setSelectedNonprofit(null) }}>
+              Saved Shortlist
+            </TabButton>
+          </div>
 
           <AnimatePresence>
             {selectedNonprofit && activeTab === 'matches' ? (
@@ -361,7 +497,7 @@ export default function DiscoveryPage() {
                   <div className="relative flex flex-col gap-5">
                     <div className="flex items-start justify-between gap-4">
                       <div>
-                        <p className="eyebrow mb-3">Selected organization</p>
+                        <p className="eyebrow mb-3">Selected Organization</p>
                         <h3 className="font-cta text-3xl text-forest">{selectedNonprofit.name}</h3>
                         <div className="mt-4 flex flex-wrap gap-2">
                           <Badge tone="grove">{selectedNonprofit.sector}</Badge>
@@ -384,7 +520,7 @@ export default function DiscoveryPage() {
                     <div className="rounded-[1.6rem] bg-forest px-5 py-5 text-cream shadow-lift">
                       <div className="mb-3 flex items-center gap-2">
                         <Sparkles className="h-4 w-4 text-sun" />
-                        <p className="font-cta text-sm text-cream/82">AI explanation</p>
+                        <p className="font-cta text-sm text-cream/82">AI Explanation</p>
                       </div>
                       <p className="text-sm leading-7 text-cream/90">
                         {loadingExplain ? 'Analyzing the overlap between your priorities and this organization’s profile...' : explanation || 'Request an explanation to see why this organization rises for the current weighting.'}
@@ -393,7 +529,7 @@ export default function DiscoveryPage() {
                       <div className="mt-6">
                         <div className="mb-4">
                           <div>
-                            <p className="font-cta text-sm uppercase tracking-[0.18em] text-cream/74">Human evaluation reminders</p>
+                            <p className="font-cta text-sm uppercase tracking-[0.18em] text-cream/74">Human Evaluation Reminders</p>
                             <p className="mt-2 text-sm leading-6 text-cream/78">
                               Use these checkpoints as a quick due-diligence reminder before approving the organization for outreach.
                             </p>
@@ -417,7 +553,7 @@ export default function DiscoveryPage() {
                                       </div>
                                       <h4 className="font-cta text-lg text-cream">{step.title}</h4>
                                       <span className="rounded-full bg-white/10 px-2.5 py-1 text-xs font-semibold text-cream/74">
-                                        Recommended review
+                                        Recommended Review
                                       </span>
                                     </div>
                                     <p className="mt-3 text-sm leading-6 text-cream/82">{step.description}</p>
@@ -443,7 +579,7 @@ export default function DiscoveryPage() {
 
                       <div className="mt-6 flex flex-wrap gap-3">
                         <Button onClick={() => handleApprove(selectedNonprofit)} className="bg-sun text-forest hover:bg-[#e7b22f]">
-                          Approve for outreach
+                          Approve For Outreach
                         </Button>
                         <p className="self-center text-sm text-cream/74">
                           Review these reminders as needed, then approve when you’re comfortable moving forward.
@@ -460,17 +596,17 @@ export default function DiscoveryPage() {
             <Surface className="px-5 py-5 sm:px-6">
               <div className="mb-5 flex items-center justify-between gap-4">
                 <div>
-                  <p className="eyebrow mb-2">Top matches</p>
-                  <h3 className="font-cta text-2xl text-forest">Organizations worth a closer look</h3>
+                  <p className="eyebrow mb-2">Top Matches</p>
+                  <h3 className="font-cta text-2xl text-forest">Organizations Worth A Closer Look</h3>
                 </div>
-                <Badge tone="sun">{filteredMatches.length} available</Badge>
+                <Badge tone="sun">{filteredMatches.length} Available</Badge>
               </div>
 
               <div className="space-y-4">
                 {filteredMatches.length === 0 ? (
                   <EmptyState
                     icon={<Trees className="h-7 w-7" />}
-                    title="No new organizations match this lens"
+                    title="No New Organizations Match This Lens"
                     body="Try widening the sector, adjusting maturity, or easing one or two weight sliders to reopen the field."
                   />
                 ) : (
@@ -501,7 +637,7 @@ export default function DiscoveryPage() {
                         </div>
 
                         <div className="min-w-[210px] rounded-[1.5rem] bg-forest px-5 py-4 text-cream lg:max-w-[240px]">
-                          <p className="eyebrow mb-3 text-cream/70">Match score</p>
+                          <p className="eyebrow mb-3 text-cream/70">Match Score</p>
                           <div className="mb-3 flex items-end gap-2">
                             <span className="font-cta text-4xl">{org.score}</span>
                             <span className="pb-1 text-sm text-cream/70">/100</span>
@@ -519,7 +655,7 @@ export default function DiscoveryPage() {
                             {org.location}
                           </div>
                           <div className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-sun">
-                            Review details <ArrowRight className="h-4 w-4" />
+                            Review Details <ArrowRight className="h-4 w-4" />
                           </div>
                         </div>
                       </div>
@@ -532,17 +668,17 @@ export default function DiscoveryPage() {
             <Surface className="px-5 py-5 sm:px-6">
               <div className="mb-5 flex items-center justify-between gap-4">
                 <div>
-                  <p className="eyebrow mb-2">Saved shortlist</p>
-                  <h3 className="font-cta text-2xl text-forest">Approved organizations for outreach</h3>
+                  <p className="eyebrow mb-2">Saved Shortlist</p>
+                  <h3 className="font-cta text-2xl text-forest">Approved Organizations For Outreach</h3>
                 </div>
-                <Badge tone="sky">{savedNonprofits.length} approved</Badge>
+                <Badge tone="sky">{savedNonprofits.length} Approved</Badge>
               </div>
 
               <div className="space-y-4">
                 {savedNonprofits.length === 0 ? (
                   <EmptyState
                     icon={<Check className="h-7 w-7" />}
-                    title="Your shortlist is still open"
+                    title="Your Shortlist Is Still Open"
                     body="Approve organizations from the discovery view to build an outreach-ready set of partners here."
                   />
                 ) : (
@@ -564,7 +700,7 @@ export default function DiscoveryPage() {
 
                         <div className="flex flex-col gap-3">
                           <Button variant="secondary" onClick={(event) => handleRemove(org.nonprofit_id, org.name, event)}>
-                            Remove from shortlist
+                            Remove From Shortlist
                           </Button>
                         </div>
                       </div>
@@ -576,7 +712,7 @@ export default function DiscoveryPage() {
                             <p className="mt-3 font-cta text-3xl text-forest">
                               {org[key] != null ? `${(org[key] * 50).toFixed(0)}` : '—'}
                             </p>
-                            <p className="text-xs text-forest/48">out of 100</p>
+                            <p className="text-xs text-forest/48">Out Of 100</p>
                           </div>
                         ))}
                       </div>
@@ -600,7 +736,7 @@ export default function DiscoveryPage() {
             <div className="flex items-start gap-3">
               <div className={`mt-1 h-2.5 w-2.5 rounded-full ${toast.kind === 'error' ? 'bg-ember' : 'bg-grove'}`} />
               <div>
-                <p className="font-cta text-sm text-forest">{toast.kind === 'error' ? 'Something needs attention' : 'Shortlist updated'}</p>
+                <p className="font-cta text-sm text-forest">{toast.kind === 'error' ? 'Something Needs Attention' : 'Shortlist Updated'}</p>
                 <p className="mt-1 text-sm leading-6 text-forest/72">{toast.message}</p>
               </div>
             </div>

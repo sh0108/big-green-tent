@@ -116,6 +116,58 @@ app.post('/api/explain', async (req, res) => {
   }
 })
 
+app.post('/api/generate-outreach', async (req, res) => {
+  const { org, field } = req.body || {}
+
+  if (!apiKey) {
+    return res.status(500).json({ error: 'Missing OPENAI_QUIZ_API_KEY — add it to your .env to enable AI regeneration.' })
+  }
+
+  const prompts = {
+    // Legacy email fields (kept for backward compatibility)
+    recipient: `Suggest one specific recipient for a cold outreach email to ${org.name}, a ${org.maturity || ''} environmental nonprofit in the ${org.sector} sector. Return a single line like "Director of Partnerships at [org name]". No extra text.`,
+    subject: `Write a professional, warm email subject line for an introduction from Big Green Tent to ${org.name} (${org.sector} sector). Keep it under 10 words. Return only the subject line, no quotes.`,
+    opening: `Write the opening paragraph of a warm, professional outreach email from Big Green Tent to the ${org.name} team. Context: "${org.mission}". Sector: ${org.sector}. Start with a greeting, then explain the shortlisting and mission alignment. 3–4 sentences. No subject line.`,
+    context: `Write a context paragraph for a donor outreach email to ${org.name} (${org.sector}). Explain that Big Green Tent is preparing its next round of donor introductions and this org was selected for its environmental impact. 2–3 sentences.`,
+    ask: `Write a direct, warm ask paragraph for an outreach email to ${org.name}. Request a short introductory call and any current giving information or program updates. 2–3 sentences. No sign-off.`,
+    closing: `Write a warm, professional email closing for an outreach from Big Green Tent to ${org.name}. Include a brief encouraging line, then a sign-off placeholder like "[Your name] / Big Green Tent Reviewer Workspace". 2–3 lines total.`,
+
+    // Press-kit PDF fields
+    aboutHeadline: `Write a short, bold headline (under 12 words) for a one-page PDF introducing Big Green Tent to ${org.name}. It should feel like a press-kit title. Return the headline only, no quotes.`,
+    aboutBgt: `Write a 3–4 sentence paragraph introducing Big Green Tent — a reviewer workspace for institutional donors focused on vetting environmental nonprofits. Audience: the ${org.name} team. Warm, credible, concise. No greeting, no sign-off.`,
+    methodology: `Write a 3–4 sentence paragraph describing Big Green Tent's review methodology: seven-metric scoring (program efficiency, revenue growth, sustainability, scale, grant distribution, geographic reach, innovation output) combined with human review. Audience: the ${org.name} team. No greeting.`,
+    whySelected: `Write a 3–4 sentence paragraph explaining why ${org.name} was selected for Big Green Tent's shortlist. Context: sector ${org.sector}, mission "${org.mission}"${org.enrichment_summary ? `, reviewer insight: "${org.enrichment_summary}"` : ''}. Cite specific strengths. No greeting.`,
+    offer: `Write a 3–4 sentence paragraph describing what Big Green Tent offers partner organizations: visibility inside the donor coordination workflow, donor introductions prepared by vetted reviewers, and periodic impact syntheses. Audience: the ${org.name} team. No greeting.`,
+    nextSteps: `Write 2–3 sentences suggesting next steps for ${org.name} — sharing their latest annual report, program updates, and a preferred point of contact, plus an invitation for a short introductory call. Warm and direct. No greeting, no sign-off.`,
+  }
+
+  const prompt = prompts[field]
+  if (!prompt) {
+    return res.status(400).json({ error: `Unknown field: ${field}` })
+  }
+
+  try {
+    const openai = new OpenAI({ apiKey })
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a professional nonprofit outreach writer for Big Green Tent, a donor coordination platform for environmental nonprofits. Write warm, credible, concise copy. Return only the requested text — no preamble, no labels, no quotes.',
+        },
+        { role: 'user', content: prompt },
+      ],
+      temperature: 0.72,
+    })
+    const text = response.choices?.[0]?.message?.content?.trim()
+    if (!text) throw new Error('Empty response from AI.')
+    res.json({ text })
+  } catch (err) {
+    console.error('Generate outreach error:', err)
+    res.status(500).json({ error: err.message || 'Generation failed.' })
+  }
+})
+
 app.post('/api/approve', (req, res) => {
   const { nonprofit_id, name, sector } = req.body || {}
   const db = getDb()
