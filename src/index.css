@@ -4,25 +4,40 @@
 
 :root {
   color-scheme: light;
-  --accent: #2563eb;
-  --text-primary: #111111;
-  --text-secondary: #6b7280;
-  --bg: #ffffff;
-  --bg-alt: #fafafa;
+  --forest: #0d3023;
+  --pine: #1a7252;
+  --grove: #2d915f;
+  --sun: #f4c146;
+  --ember: #ed5632;
+  --sky: #4fa2db;
+  --ink: #231f20;
+  --cream: #f6f0e5;
+  --mist: #e7ddce;
+  --surface: rgba(255, 252, 247, 0.88);
+  --stroke: rgba(35, 31, 32, 0.1);
+  --shadow: 0 24px 60px rgba(13, 48, 35, 0.11);
 }
 
 * {
   box-sizing: border-box;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   margin: 0;
-  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Display",
-    "SF Pro Text", "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
-  color: var(--text-primary);
-  background: var(--bg);
+  font-family: "Articulat CF Regular", "Avenir Next", system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", sans-serif;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at top left, rgba(244, 193, 70, 0.16), transparent 28%),
+    radial-gradient(circle at top right, rgba(79, 162, 219, 0.14), transparent 24%),
+    linear-gradient(180deg, #f8f2e8 0%, #f4ecdf 100%);
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 #root {
@@ -31,123 +46,294 @@ body {
 
 .app-shell {
   min-height: 100vh;
-  background: var(--bg);
+  background: transparent;
 }
 
 @layer components {
-  .glass-card {
-    @apply rounded-3xl border border-slate-200/70 bg-white shadow-sm;
+  .brand-shell {
+    @apply relative min-h-screen overflow-hidden;
   }
 
-  .glass-surface {
-    @apply rounded-2xl border border-slate-200/70 bg-white/70 backdrop-blur-md;
+  .brand-shell::before {
+    background-image: url('/brand/BGT_OrganicFrame-1_Grove.png');
+    background-position: top right;
+    background-repeat: no-repeat;
+    background-size: min(36rem, 55vw);
+    content: '';
+    inset: 0;
+    opacity: 0.09;
+    pointer-events: none;
+    position: absolute;
   }
 
-  .primary-btn {
-    @apply rounded-full bg-[color:var(--accent)] px-6 py-3 text-sm font-semibold text-white shadow-sm transition;
+  .page-wrap {
+    @apply relative mx-auto w-full max-w-7xl px-4 pb-16 pt-4 sm:px-6 lg:px-8;
   }
 
-  .secondary-btn {
-    @apply rounded-full border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-700 transition;
+  .brand-card {
+    background: var(--surface);
+    border: 1px solid var(--stroke);
+    box-shadow: var(--shadow);
+    @apply rounded-[2rem] backdrop-blur-sm;
+  }
+
+  .brand-card-strong {
+    background: linear-gradient(180deg, rgba(255, 252, 247, 0.98) 0%, rgba(248, 242, 232, 0.98) 100%);
+    border: 1px solid rgba(13, 48, 35, 0.12);
+    box-shadow: 0 20px 48px rgba(13, 48, 35, 0.14);
+    @apply rounded-[2rem];
+  }
+
+  .eyebrow {
+    color: rgba(26, 114, 82, 0.8);
+    font-family: "Articulat CF Bold", "Avenir Next Demi Bold", "Avenir Next", system-ui, sans-serif;
+    font-size: 0.75rem;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+  }
+
+  .display-title {
+    font-family: "GT Alpina Condensed Light", "Cormorant Garamond", "Iowan Old Style", serif;
+    font-weight: 300;
+    letter-spacing: -0.03em;
+    line-height: 0.92;
+  }
+
+  .accent-script {
+    font-family: "GT Alpina Condensed Light Italic", "Cormorant Garamond", "Iowan Old Style", serif;
+    font-style: italic;
+    font-weight: 300;
+  }
+
+  .body-copy {
+    color: rgba(35, 31, 32, 0.84);
+    font-family: "Articulat CF Regular", "Avenir Next", system-ui, sans-serif;
+    font-size: 1rem;
+    line-height: 1.75rem;
+  }
+
+  .cta-text {
+    font-family: "Articulat CF Bold", "Avenir Next Demi Bold", "Avenir Next", system-ui, sans-serif;
+    letter-spacing: 0.02em;
+  }
+
+  .brand-divider {
+    @apply h-4 w-full bg-left bg-no-repeat opacity-90;
+    background-image: url('/brand/Asset 19.svg');
+    background-size: 11rem auto;
+  }
+
+  .brand-input {
+    background: rgba(255, 255, 255, 0.8);
+    border: 1px solid rgba(35, 31, 32, 0.1);
+    color: var(--ink);
+    width: 100%;
+    @apply rounded-[1.35rem] px-4 py-3 text-sm outline-none transition duration-200;
+  }
+
+  .brand-select {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23231f20' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-position: calc(100% - 1.15rem) center;
+    background-repeat: no-repeat;
+    background-size: 1rem;
+    padding-left: 1rem;
+    padding-right: 3rem;
+  }
+
+  .brand-input::placeholder {
+    color: rgba(35, 31, 32, 0.35);
+  }
+
+  .brand-input:focus {
+    border-color: rgba(26, 114, 82, 0.5);
+    box-shadow: 0 0 0 4px rgba(26, 114, 82, 0.12);
+  }
+
+  .brand-select::-ms-expand {
+    display: none;
+  }
+
+  .brand-button {
+    @apply cta-text inline-flex items-center justify-center rounded-full px-5 py-3 text-sm transition duration-200;
+  }
+
+  .brand-button:focus-visible,
+  .brand-input:focus-visible,
+  a:focus-visible,
+  button:focus-visible,
+  select:focus-visible {
+    outline: 3px solid rgba(79, 162, 219, 0.48);
+    outline-offset: 3px;
+  }
+
+  .brand-button-primary {
+    @apply brand-button hover:-translate-y-0.5;
+    background: var(--forest);
+    color: var(--cream);
+    box-shadow: 0 12px 24px rgba(13, 48, 35, 0.2);
+  }
+
+  .brand-button-primary:hover {
+    background: var(--pine);
+  }
+
+  .brand-button-primary:disabled {
+    background: rgba(244, 193, 70, 0.52);
+    box-shadow: none;
+    color: rgba(13, 48, 35, 0.72);
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  .brand-button-secondary {
+    @apply brand-button;
+    background: rgba(255, 255, 255, 0.7);
+    border: 1px solid rgba(13, 48, 35, 0.1);
+    color: var(--forest);
+  }
+
+  .brand-button-secondary:hover {
+    background: rgba(255, 255, 255, 0.95);
+    border-color: rgba(26, 114, 82, 0.3);
+  }
+
+  .brand-button-secondary:disabled {
+    background: rgba(255, 255, 255, 0.45);
+    border-color: rgba(255, 255, 255, 0.12);
+    color: rgba(246, 240, 229, 0.48);
+    cursor: not-allowed;
+  }
+
+  .stat-pill {
+    background: rgba(255, 255, 255, 0.7);
+    border: 1px solid rgba(26, 114, 82, 0.1);
+    color: rgba(13, 48, 35, 0.8);
+    @apply inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold;
+  }
+
+  .range-track {
+    @apply h-2 w-full appearance-none rounded-full bg-[linear-gradient(90deg,rgba(13,48,35,0.18),rgba(45,145,95,0.32))];
+  }
+
+  .range-track::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    background: linear-gradient(180deg, var(--sun) 0%, #dba82e 100%);
+    border: 3px solid white;
+    border-radius: 999px;
+    box-shadow: 0 8px 20px rgba(219, 168, 46, 0.32);
+    cursor: pointer;
+    height: 20px;
+    width: 20px;
+  }
+
+  .range-track::-moz-range-thumb {
+    background: linear-gradient(180deg, var(--sun) 0%, #dba82e 100%);
+    border: 3px solid white;
+    border-radius: 999px;
+    box-shadow: 0 8px 20px rgba(219, 168, 46, 0.32);
+    cursor: pointer;
+    height: 20px;
+    width: 20px;
+  }
+
+  .soft-grid {
+    background-image:
+      linear-gradient(rgba(13, 48, 35, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(13, 48, 35, 0.045) 1px, transparent 1px);
+    background-position: center;
+    background-size: 34px 34px;
+  }
+
+  .hero-tent {
+    background-image:
+      linear-gradient(135deg, rgba(13, 48, 35, 0.96), rgba(26, 114, 82, 0.92)),
+      url('/brand/TENT_HEADER-Forest.png');
+    background-position: center, bottom center;
+    background-repeat: no-repeat;
+    background-size: cover, min(28rem, 78%);
+  }
+
+  .dashboard-tent {
+    background:
+      linear-gradient(135deg, rgba(13, 48, 35, 0.94), rgba(26, 114, 82, 0.92)),
+      radial-gradient(circle at top right, rgba(244, 193, 70, 0.18), transparent 30%);
+  }
+
+  .hero-marks::after {
+    background-image: url('/brand/Asset 53.svg');
+    background-position: bottom right;
+    background-repeat: no-repeat;
+    background-size: 10rem auto;
+    content: '';
+    inset: 0;
+    opacity: 0.72;
+    pointer-events: none;
+    position: absolute;
+  }
+
+  .page-noise::before {
+    background-image: url('/brand/Asset 37.svg');
+    background-position: top left;
+    background-repeat: no-repeat;
+    background-size: 12rem auto;
+    content: '';
+    height: 10rem;
+    left: -1rem;
+    opacity: 0.16;
+    pointer-events: none;
+    position: absolute;
+    top: 6rem;
+    width: 12rem;
   }
 }
 
-.fade-in {
-  animation: fadeIn 0.6s ease-out both;
+/* ── Print / PDF export ──────────────────────────────────────────────────── */
+#bgt-print-area {
+  display: none;
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
+@media print {
+  /* Hide the entire app shell */
+  body > *:not(#bgt-print-area) {
+    display: none !important;
+    visibility: hidden !important;
   }
-  to {
-    opacity: 1;
-    transform: translateY(0);
+
+  body {
+    background: #fff !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
-}
 
-/* Mascot Animations */
-.mascot-bounce {
-  animation: bounce 2s infinite cubic-bezier(0.68, -0.55, 0.265, 1.55);
-}
-
-@keyframes bounce {
-  0%, 100% {
-    transform: translateY(0);
+  #bgt-print-area {
+    display: block !important;
+    visibility: visible !important;
+    position: static !important;
+    width: 100% !important;
+    height: auto !important;
   }
-  50% {
-    transform: translateY(-20px);
-  }
-}
 
-.mascot-float {
-  animation: float 3s ease-in-out infinite;
-}
-
-.mascot-lookingup {
-  animation: lookingup 2.5s ease-in-out infinite;
-}
-
-@keyframes lookingup {
-  0%, 100% {
-    transform: translateY(-5px) translateX(-2px);
-  }
-  50% {
-    transform: translateY(0px) translateX(0px);
+  @page {
+    margin: 18mm 20mm;
+    size: A4 portrait;
   }
 }
 
-@keyframes float {
-  0%, 100% {
-    transform: translateY(0px);
+@media (max-width: 768px) {
+  .brand-shell::before {
+    background-size: 26rem;
+    opacity: 0.06;
   }
-  50% {
-    transform: translateY(-15px);
-  }
-}
 
-.mascot-pulse {
-  animation: mascotPulse 2s ease-in-out infinite;
-}
+  .hero-marks::after {
+    background-size: 7rem auto;
+    opacity: 0.48;
+  }
 
-@keyframes mascotPulse {
-  0%, 100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.05);
-  }
-}
-
-.mascot-excited {
-  animation: excited 2s ease-in-out infinite;
-}
-
-@keyframes excited {
-  0%, 100% {
-    transform: scale(1) translateY(0);
-  }
-  25% {
-    transform: scale(1.03) translateY(-8px) rotate(-2deg);
-  }
-  50% {
-    transform: scale(1) translateY(0);
-  }
-  75% {
-    transform: scale(1.03) translateY(-8px) rotate(2deg);
-  }
-}
-
-.mascot-glow {
-  animation: glow 2s ease-in-out infinite;
-}
-
-@keyframes glow {
-  0%, 100% {
-    filter: drop-shadow(0 0 5px rgba(47, 107, 255, 0.3));
-  }
-  50% {
-    filter: drop-shadow(0 0 20px rgba(47, 107, 255, 0.6));
+  .page-noise::before {
+    opacity: 0.1;
+    top: 8rem;
   }
 }

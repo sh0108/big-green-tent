@@ -2,7 +2,9 @@ import fs from 'fs'
 import path from 'path'
 import Database from 'better-sqlite3'
 
-const DB_PATH = path.resolve('server', 'big_green_tent.db')
+const DB_PATH = process.env.DATABASE_PATH
+  ? path.resolve(process.env.DATABASE_PATH)
+  : path.resolve('server', 'big_green_tent.db')
 let db
 
 export function getDb() {

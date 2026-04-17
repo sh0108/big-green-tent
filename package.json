@@ -7,6 +7,7 @@
     "dev": "concurrently \"vite\" \"npm run dev:server\"",
     "dev:server": "node server/index.js",
     "build": "vite build",
+    "start": "node server/index.js",
     "lint": "eslint .",
     "preview": "vite preview",
     "agent:dev": "node agents/voiceTutor.js dev",
@@ -21,13 +22,14 @@
     "@livekit/components-styles": "^1.2.0",
     "@livekit/noise-cancellation-node": "^0.1.9",
     "@livekit/protocol": "^1.44.0",
+    "@opentelemetry/api": "^1.9.0",
     "better-sqlite3": "^11.5.0",
     "clsx": "^2.1.1",
+    "d3-geo": "^3.1.1",
     "dotenv": "^16.6.1",
     "express": "^4.21.2",
     "framer-motion": "^11.18.2",
     "konva": "^10.2.0",
-    "@opentelemetry/api": "^1.9.0",
     "livekit-client": "^2.0.10",
     "livekit-server-sdk": "^2.15.0",
     "lucide-react": "^0.562.0",
@@ -40,7 +42,8 @@
     "react-force-graph-2d": "^1.29.0",
     "react-konva": "^19.2.1",
     "react-router-dom": "^7.12.0",
-    "simplex-noise": "^4.0.3"
+    "simplex-noise": "^4.0.3",
+    "topojson-client": "^3.1.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
