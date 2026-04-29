@@ -70,6 +70,7 @@ function hashOffset(seed) {
 
 export default function DiscoveryMap({
   orgs = [],
+  manualReviewOrgs = [],
   approvedIds = new Set(),
   stateFilter = 'ALL',
   onStateChange,
@@ -111,19 +112,23 @@ export default function DiscoveryMap({
 
   const availableStates = useMemo(() => {
     const counts = {}
-    orgs.forEach((org) => {
+    const allMappedOrgs = [...orgs, ...manualReviewOrgs]
+    allMappedOrgs.forEach((org) => {
       if (!org.state) return
       counts[org.state] = (counts[org.state] || 0) + 1
     })
     return Object.keys(counts)
       .sort()
       .map((code) => ({ code, name: STATE_NAMES[code] || code, count: counts[code] }))
-  }, [orgs])
+  }, [manualReviewOrgs, orgs])
 
   const visibleOrgs = useMemo(() => {
-    if (stateFilter === 'ALL') return orgs
-    return orgs.filter((org) => org.state === stateFilter)
-  }, [orgs, stateFilter])
+    const candidates = orgs.map((org) => ({ ...org, mapCategory: 'candidate' }))
+    const flagged = manualReviewOrgs.map((org) => ({ ...org, mapCategory: 'manualReview' }))
+    const combined = [...candidates, ...flagged]
+    if (stateFilter === 'ALL') return combined
+    return combined.filter((org) => org.state === stateFilter)
+  }, [manualReviewOrgs, orgs, stateFilter])
 
   const markers = useMemo(() => {
     return visibleOrgs
@@ -143,15 +148,29 @@ export default function DiscoveryMap({
 
   const stateCounts = useMemo(() => {
     const counts = {}
-    orgs.forEach((org) => {
+    const allMappedOrgs = [...orgs, ...manualReviewOrgs]
+    allMappedOrgs.forEach((org) => {
       if (!org.state) return
       counts[org.state] = (counts[org.state] || 0) + 1
     })
     return counts
-  }, [orgs])
+  }, [manualReviewOrgs, orgs])
 
-  const approvedCount = markers.filter((marker) => marker.approved).length
-  const candidateCount = markers.length - approvedCount
+  const flaggedCount = markers.filter((marker) => marker.mapCategory === 'manualReview').length
+  const approvedCount = markers.filter((marker) => marker.approved && marker.mapCategory !== 'manualReview').length
+  const candidateCount = markers.length - approvedCount - flaggedCount
+
+  const markerFill = (marker) => {
+    if (marker.mapCategory === 'manualReview') return '#ed7d32'
+    if (marker.approved) return '#2d915f'
+    return '#f4c146'
+  }
+
+  const markerLabel = (marker) => {
+    if (marker.mapCategory === 'manualReview') return 'Flagged for manual review'
+    if (marker.approved) return 'Approved'
+    return 'Candidate'
+  }
 
   return (
     <div className="brand-card px-5 py-5 sm:px-6 sm:py-6">
@@ -241,7 +260,7 @@ export default function DiscoveryMap({
                 cx={marker.x}
                 cy={marker.y}
                 r={hoveredOrg === marker.ein ? 8 : 6}
-                fill={marker.approved ? '#2d915f' : '#f4c146'}
+                fill={markerFill(marker)}
                 stroke="#0d3023"
                 strokeWidth={1.5}
                 onMouseEnter={() => setHoveredOrg(marker.ein)}
@@ -264,7 +283,7 @@ export default function DiscoveryMap({
                     {marker.name.length > 34 ? `${marker.name.slice(0, 34)}…` : marker.name}
                   </text>
                   <text x={marker.x + 22} y={marker.y + 7} fill="#f4c146" fontSize="11" fontWeight="600">
-                    {marker.state} · Score {marker.computedOverallScore ?? marker.scoreOverall ?? '—'}
+                    {markerLabel(marker)} · {marker.state} · Score {marker.computedOverallScore ?? marker.scoreOverall ?? '—'}
                   </text>
                 </g>
               ) : null}
@@ -276,6 +295,7 @@ export default function DiscoveryMap({
       <div className="mt-4 flex flex-wrap items-center gap-4 text-sm text-forest/70">
         <LegendSwatch color="#f4c146" label={`Candidates · ${candidateCount}`} />
         <LegendSwatch color="#2d915f" label={`Approved · ${approvedCount}`} />
+        <LegendSwatch color="#ed7d32" label={`Flagged For Manual Review · ${flaggedCount}`} />
         <span className="inline-flex items-center gap-1.5 text-xs text-forest/50">
           <MapPin className="h-3.5 w-3.5" />
           Click a state or marker to filter

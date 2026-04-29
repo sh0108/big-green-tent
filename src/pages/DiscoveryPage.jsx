@@ -43,17 +43,45 @@ const SECTOR_OPTIONS = [
 const DEFAULT_SCORE_THRESHOLD = 70
 const WEBSITE_MATCH_OPTIONS = ['Confirmed', 'Partial', 'Unclear', 'Diverged', 'Not available']
 const PROGRAM_FOCUS_OPTIONS = ['Highly Focused', 'Moderately Focused', 'Diversified', 'Sprawling', 'Tangential']
+const PROGRAM_FOCUS_DESCRIPTIONS = {
+  'Highly Focused': 'Water is the clear center of the organization’s work.',
+  'Moderately Focused': 'Water is important, but shares space with a few adjacent priorities.',
+  Diversified: 'Water sits alongside several other environmental priorities.',
+  Sprawling: 'The organization covers many issue areas, with water as only one part.',
+  Tangential: 'Water appears only lightly in the overall mission.',
+}
 const CONFIDENCE_OPTIONS = [
-  { value: 'ALL', label: 'Show all' },
-  { value: 'HIGH_MEDIUM', label: 'High & Medium confidence only' },
-  { value: 'HIGH_ONLY', label: 'High confidence only' },
+  { value: 'ALL', label: 'Show all organizations' },
+  { value: 'HIGH_MEDIUM', label: 'Only show high and medium confidence organizations' },
+  { value: 'HIGH_ONLY', label: 'Only show high confidence organizations' },
 ]
+const WEBSITE_MATCH_DESCRIPTIONS = {
+  Confirmed: 'The website clearly supports the mission fit.',
+  Partial: 'The website supports part of the mission fit, but not fully.',
+  Unclear: 'The website does not make the water connection easy to verify.',
+  Diverged: 'The website suggests the organization may have drifted from the expected focus.',
+  'Not available': 'No usable website signal was available.',
+}
 const MATURITY_OPTIONS = [
   { value: 'All', label: 'All maturity levels' },
   { value: 'Emerging', label: 'Emerging (0-5 years of operation)' },
   { value: 'Established', label: 'Established (5-15 years of operation)' },
   { value: 'Mature', label: 'Mature (15+ years of operation)' },
 ]
+const ALIGNMENT_LABELS = {
+  1: '1 = Minimal',
+  2: '2 = Tangential',
+  3: '3 = Some water connection',
+  4: '4 = Strong adjacent',
+  5: '5 = Core water mission',
+}
+const ALIGNMENT_EXPLANATIONS = {
+  1: 'Minimal — hardly any connection to water at all.',
+  2: 'Tangential — water barely comes up.',
+  3: 'Some water connection — water is part of what they do but not the focus.',
+  4: 'Strong adjacent — clear environmental org with a significant water component.',
+  5: 'Core water mission — this is unambiguously a water org, like a watershed council or marine conservation group.',
+}
 const STATE_NAMES = {
   AK: 'Alaska',
   AL: 'Alabama',
@@ -256,6 +284,28 @@ function getConfidenceMeaning(band) {
   return 'Several key metrics were missing; scores are based on limited data.'
 }
 
+function normalizeMissionStatement(text) {
+  if (!text) return text
+  const trimmed = String(text).trim()
+  if (!trimmed) return trimmed
+
+  const lettersOnly = trimmed.replace(/[^A-Za-z]+/g, '')
+  const uppercaseLetters = lettersOnly.replace(/[^A-Z]/g, '').length
+  const looksAllCaps = lettersOnly.length > 40 && uppercaseLetters / lettersOnly.length > 0.8
+
+  if (!looksAllCaps) return trimmed
+
+  const lowered = trimmed.toLowerCase()
+  const sentenceCased = lowered.replace(/(^|[.!?]\s+)([a-z])/g, (match, prefix, char) => `${prefix}${char.toUpperCase()}`)
+
+  return sentenceCased
+    .replace(/\birs\b/g, 'IRS')
+    .replace(/\busa\b/g, 'USA')
+    .replace(/\bu\.s\.\b/gi, 'U.S.')
+    .replace(/\bii-b\b/gi, 'II-B')
+    .replace(/\birc\b/g, 'IRC')
+}
+
 function WeightMixIndicator({ distribution }) {
   const segments = distribution
     .map((item, index) => {
@@ -393,13 +443,17 @@ function HeroStep({ step, title, body, cta, onClick, disabled = false }) {
 
 function ConfidencePill({ band }) {
   const meta = confidenceMeta(band)
-  return <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${meta.tone}`}>{meta.label}</span>
+  return (
+    <span className={`inline-flex items-center justify-center rounded-full border px-3 py-1 text-xs font-semibold leading-none ${meta.tone}`}>
+      {meta.label}
+    </span>
+  )
 }
 
 function MatchScoreBox({ score }) {
   const normalized = clampScore(score) ?? 0
   return (
-    <div className="min-w-[132px] rounded-[1.1rem] bg-forest px-4 py-3 text-cream">
+    <div className="w-full rounded-[1.1rem] bg-forest px-4 py-3 text-cream">
       <p className="text-[0.65rem] uppercase tracking-[0.18em] text-cream/62">Match score</p>
       <div className="mt-1 flex items-end gap-1">
         <span className="font-cta text-3xl">{normalized}</span>
@@ -445,7 +499,7 @@ function MissionBadgeRow({ org }) {
     <div className="mt-3 flex flex-wrap gap-2">
       <span
         title={org.missionAlignmentRationale || undefined}
-        className="inline-flex items-center gap-2 rounded-full border border-forest/8 bg-forest/4 px-3 py-1.5 text-xs font-semibold text-forest"
+        className="inline-flex items-center justify-center gap-2 rounded-full border border-forest/8 bg-forest/4 px-3 py-1.5 text-xs font-semibold leading-none text-forest"
       >
         Mission alignment {org.missionAlignmentScore || 0}/5
       </span>
@@ -471,7 +525,7 @@ function EligibilityBanner({ org }) {
 
 function TopMatchCard({ org, score, saved, onOpen, onToggleShortlist, helperText, actionLabel }) {
   return (
-    <div className="rounded-[1.8rem] border border-forest/8 bg-white/72 px-5 py-5 shadow-soft sm:px-6">
+    <div id={`org-card-${org.ein}`} className="rounded-[1.8rem] border border-forest/8 bg-white/72 px-5 py-5 shadow-soft sm:px-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -492,9 +546,9 @@ function TopMatchCard({ org, score, saved, onOpen, onToggleShortlist, helperText
           </div>
         </div>
 
-        <div className="flex shrink-0 flex-col gap-3 lg:items-end">
+        <div className="flex w-full shrink-0 flex-col gap-3 lg:w-[188px] lg:items-stretch">
           <MatchScoreBox score={score} />
-          <Button variant={saved ? 'secondary' : 'primary'} onClick={() => onToggleShortlist(org)}>
+          <Button variant={saved ? 'secondary' : 'primary'} onClick={() => onToggleShortlist(org)} className="w-full">
             {actionLabel}
           </Button>
         </div>
@@ -568,6 +622,201 @@ function ReviewerReminderCard({ step, org }) {
         <ExternalLink className="h-3.5 w-3.5" />
       </a>
     </div>
+  )
+}
+
+function SelectedOrgPanel({
+  selectedOrg,
+  shortlistedEins,
+  revealedExplanation,
+  loadingPanel,
+  handleGenerateExplanation,
+  handleToggleShortlist,
+  setSelectedOrg,
+  notes,
+  setNotes,
+  saveNote,
+}) {
+  const selectedNote = selectedOrg ? notes[selectedOrg.ein] || '' : ''
+
+  if (!selectedOrg) return null
+
+  return (
+    <Surface className="px-5 py-5 sm:px-6">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="eyebrow mb-2">Selected organization</p>
+          <h2 className="font-cta text-4xl text-forest">{selectedOrg.name}</h2>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Badge tone="grove">{selectedOrg.sector}</Badge>
+            {selectedOrg.maturityTier ? <Badge tone="sky">{selectedOrg.maturityTier}</Badge> : null}
+            {selectedOrg.state ? <Badge>{selectedOrg.state}</Badge> : null}
+            <ConfidencePill band={selectedOrg.confidenceBand} />
+            {normalizedEligibilityLabel(selectedOrg) ? <Badge tone="sun">{normalizedEligibilityLabel(selectedOrg)}</Badge> : null}
+          </div>
+          {selectedOrg.missionSummary ? (
+            <p className="mt-5 max-w-4xl border-l-4 border-sun pl-4 text-[1.05rem] leading-8 text-forest/72">{selectedOrg.missionSummary}</p>
+          ) : null}
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setSelectedOrg(null)}
+          className="flex h-12 w-12 items-center justify-center rounded-full border border-forest/10 bg-white/70 text-forest transition hover:bg-white"
+          aria-label="Close organization details"
+        >
+          <X className="h-5 w-5" />
+        </button>
+      </div>
+
+      <div className="mt-6 grid gap-5 xl:grid-cols-[minmax(0,1.35fr),minmax(320px,0.9fr)]">
+        <div className="space-y-5">
+          <div className="rounded-[1.5rem] border border-forest/8 bg-white/72 px-4 py-4">
+            <p className="text-[0.7rem] uppercase tracking-[0.18em] text-forest/52">Data confidence</p>
+            <div className="mt-3 flex items-center gap-3">
+              <span className={`h-3 w-3 rounded-full ${selectedOrg.confidenceBand === 'HIGH' ? 'bg-grove' : selectedOrg.confidenceBand === 'MEDIUM' ? 'bg-sun' : 'bg-ember'}`} />
+              <p className="font-semibold text-forest">{selectedOrg.confidenceBand}</p>
+            </div>
+            <p className="mt-3 max-w-[38rem] text-sm leading-6 text-forest/72" style={{ textWrap: 'pretty' }}>
+              {getConfidenceMeaning(selectedOrg.confidenceBand)}
+            </p>
+          </div>
+
+          <div className="rounded-[1.5rem] border border-forest/8 bg-white/72 px-4 py-4">
+            <p className="text-[0.7rem] uppercase tracking-[0.18em] text-forest/52">Mission profile</p>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <InfoBlock title="Mission Alignment" body={`${selectedOrg.missionAlignmentScore || 0}/5 · ${selectedOrg.missionAlignmentRationale || 'No rationale provided.'}`} />
+              <InfoBlock title="Program Focus" body={`${selectedOrg.programFocus || 'Not available'}${selectedOrg.programFocusRationale ? ` · ${selectedOrg.programFocusRationale}` : ''}`} />
+              <InfoBlock title="Geographic Scope" body={selectedOrg.geographicScope || 'Not available'} />
+              <InfoBlock title="Website Match" body={`${selectedOrg.websiteMissionMatch || 'Not available'}${selectedOrg.websiteRecentActivity ? ` · ${selectedOrg.websiteRecentActivity}` : ''}`} />
+            </div>
+            {selectedOrg.websiteUrl ? (
+              <a href={selectedOrg.websiteUrl} target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-pine hover:text-forest">
+                Visit Website
+                <ExternalLink className="h-4 w-4" />
+              </a>
+            ) : null}
+          </div>
+
+          <div className="rounded-[1.7rem] border border-white/8 bg-forest px-5 py-5 text-cream shadow-lift">
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-sun" />
+                <p className="font-cta text-lg text-cream">AI Explanation</p>
+              </div>
+              {revealedExplanation[selectedOrg.ein] ? (
+                <>
+                  <p className="max-w-[42rem] text-sm leading-7 text-cream/86" style={{ textWrap: 'pretty' }}>
+                    {selectedOrg.capacityNarrative || 'Capacity narrative not yet generated for this organization.'}
+                  </p>
+                  {selectedOrg.missionStatement ? (
+                    <div className="rounded-[1.2rem] border border-white/12 bg-white/8 px-4 py-4">
+                      <p className="text-xs uppercase tracking-[0.18em] text-cream/58">Mission statement</p>
+                      <p className="mt-2 max-w-[40rem] text-sm leading-6 text-cream/82" style={{ textWrap: 'pretty' }}>
+                        {normalizeMissionStatement(selectedOrg.missionStatement)}
+                      </p>
+                    </div>
+                  ) : null}
+                </>
+              ) : (
+                <div className="space-y-4">
+                  <p className="text-sm leading-7 text-cream/78">
+                    Generate the capacity-focused narrative for this organization when you are ready to inspect the reasoning.
+                  </p>
+                  <Button onClick={() => handleGenerateExplanation(selectedOrg)} disabled={loadingPanel}>
+                    {loadingPanel ? 'Generating...' : 'Generate explanation'}
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {selectedOrg.rawMetrics?.filingContinuityAdjustedNote ? (
+            <div className="rounded-[1.35rem] border border-sky/20 bg-sky/8 px-4 py-4">
+              <p className="font-semibold text-forest">Filing Continuity Adjusted</p>
+              <p className="mt-2 max-w-[40rem] text-sm leading-6 text-forest/72" style={{ textWrap: 'pretty' }}>
+                {selectedOrg.rawMetrics.filingContinuityAdjustedNote}
+              </p>
+              <p className="mt-2 text-xs text-forest/55">
+                Score uses adjusted figure. Raw: {selectedOrg.rawMetrics.filingContinuityRaw ?? '—'}% → Adjusted: {selectedOrg.rawMetrics.filingContinuityAdjusted ?? '—'}%
+              </p>
+            </div>
+          ) : null}
+
+          <details className="rounded-[1.35rem] border border-forest/8 bg-white/72 px-4 py-4">
+            <summary className="cursor-pointer list-none font-cta text-sm text-forest">
+              <span className="inline-flex items-center gap-2">
+                Source Data
+                <ChevronDown className="h-4 w-4" />
+              </span>
+            </summary>
+            <div className="mt-4 grid gap-3 text-sm leading-6 text-forest/72">
+              {selectedOrg.program1Desc ? <InfoBlock title="Program 1" body={selectedOrg.program1Desc} /> : null}
+              {selectedOrg.program2Desc ? <InfoBlock title="Program 2" body={selectedOrg.program2Desc} /> : null}
+              {selectedOrg.program3Desc ? <InfoBlock title="Program 3" body={selectedOrg.program3Desc} /> : null}
+              {selectedOrg.scheduleO ? <InfoBlock title="Schedule O / Narrative" body={selectedOrg.scheduleO} /> : null}
+              {selectedOrg.websiteTextExcerpt ? <InfoBlock title="Website Excerpt" body={selectedOrg.websiteTextExcerpt} /> : null}
+            </div>
+          </details>
+
+          {selectedOrg.hardRedFlags ? (
+            <div className="rounded-[1.35rem] border border-ember/28 bg-ember/8 px-4 py-4">
+              <p className="font-semibold text-ember">Hard Red Flag</p>
+                      <p className="mt-2 max-w-[40rem] text-sm leading-6 text-forest/72" style={{ textWrap: 'pretty' }}>
+                        {selectedOrg.hardRedFlags}
+                      </p>
+            </div>
+          ) : null}
+
+          {selectedOrg.softFlags ? (
+            <div className="rounded-[1.35rem] border border-sun/30 bg-sun/10 px-4 py-4">
+              <p className="font-semibold text-forest">Soft Flag</p>
+                      <p className="mt-2 max-w-[40rem] text-sm leading-6 text-forest/72" style={{ textWrap: 'pretty' }}>
+                        {selectedOrg.softFlags}
+                      </p>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="space-y-5">
+          <div className="rounded-[1.7rem] border border-white/8 bg-forest px-5 py-5 text-cream shadow-lift">
+            <div className="mb-4 flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4 text-sun" />
+              <p className="font-cta text-lg text-cream">Human evaluation reminders</p>
+            </div>
+            <div className="space-y-3">
+              {HUMAN_REVIEW_STEPS.map((_, index) => (
+                <ReviewerReminderCard key={HUMAN_REVIEW_STEPS[index].key} step={index} org={selectedOrg} />
+              ))}
+            </div>
+            <div className="mt-5">
+              <Button variant={shortlistedEins.has(selectedOrg.ein) ? 'secondary' : 'primary'} onClick={() => handleToggleShortlist(selectedOrg)}>
+                {shortlistedEins.has(selectedOrg.ein) ? 'Remove from Shortlist' : 'Save to Shortlist'}
+              </Button>
+              <p className="mt-3 text-xs text-cream/64">
+                Review the checkpoints above, then save when you&apos;re comfortable moving forward.
+              </p>
+            </div>
+          </div>
+
+          <div className="rounded-[1.5rem] border border-forest/8 bg-white/72 px-4 py-4">
+            <label className="font-cta text-sm text-forest">Reviewer Notes</label>
+            <textarea
+              value={selectedNote}
+              onChange={(event) =>
+                setNotes((current) => ({ ...current, [selectedOrg.ein]: event.target.value }))
+              }
+              rows={7}
+              placeholder="Add your notes after reviewing the checkpoints above..."
+              className="brand-input mt-3 min-h-[170px] resize-y"
+            />
+            <div className="mt-3 flex justify-end">
+              <Button onClick={saveNote}>Save Notes</Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Surface>
   )
 }
 
@@ -840,8 +1089,6 @@ export default function DiscoveryPage() {
     setToast({ kind: 'success', message: `Notes saved for ${selectedOrg.name}.` })
   }
 
-  const selectedNote = selectedOrg ? notes[selectedOrg.ein] || '' : ''
-
   return (
     <div className="relative flex flex-col gap-8">
       <Surface strong className="dashboard-tent hero-marks relative overflow-hidden px-5 py-5 text-cream sm:px-7 sm:py-6">
@@ -905,7 +1152,7 @@ export default function DiscoveryPage() {
               if (!topMatch) return
               setActiveTab('topMatches')
               openOrg(topMatch, { autoRevealExplanation: true })
-              scrollToSection('selected-organization-panel', 250)
+              scrollToSection(`org-card-${topMatch.ein}`, 220)
             }}
             disabled={!topMatch}
           />
@@ -935,12 +1182,14 @@ export default function DiscoveryPage() {
 
       <DiscoveryMap
         orgs={topMatches}
+        manualReviewOrgs={scoredManualOrgs}
         approvedIds={shortlistedEins}
         stateFilter={filters.state}
         onStateChange={(state) => updateFilter('state', state)}
         onSelectOrg={(org) => {
-          setActiveTab('topMatches')
+          setActiveTab(org.mapCategory === 'manualReview' ? 'manualReview' : 'topMatches')
           openOrg(org)
+          scrollToSection(`org-card-${org.ein}`, 180)
         }}
       />
 
@@ -961,7 +1210,7 @@ export default function DiscoveryPage() {
 
           <div className="space-y-5">
             <div>
-              <FieldLabel title="Environmental Sector" detail="Full taxonomy shown for client preview" />
+              <FieldLabel title="Environmental Sector" />
               <select value={filters.sector} onChange={(event) => updateFilter('sector', event.target.value)} className="brand-input brand-select">
                 {SECTOR_OPTIONS.map((option) => (
                   <option key={option} value={option}>
@@ -972,7 +1221,7 @@ export default function DiscoveryPage() {
             </div>
 
             <div>
-              <FieldLabel title="State" detail="Map and dropdown stay in sync" />
+              <FieldLabel title="State" />
               <select value={filters.state} onChange={(event) => updateFilter('state', event.target.value)} className="brand-input brand-select">
                 <option value="ALL">All states</option>
                 {stateOptions.map((option) => (
@@ -984,7 +1233,7 @@ export default function DiscoveryPage() {
             </div>
 
             <div>
-              <FieldLabel title="Maturity" detail="Filter by lifecycle stage" />
+              <FieldLabel title="Maturity" />
               <select value={filters.maturityTier} onChange={(event) => updateFilter('maturityTier', event.target.value)} className="brand-input brand-select">
                 {MATURITY_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -995,7 +1244,10 @@ export default function DiscoveryPage() {
             </div>
 
             <div>
-              <FieldLabel title="Minimum alignment score" detail="1 = minimal water connection · 5 = core water mission" />
+              <FieldLabel title="Minimum Alignment Score" />
+              <p className="mb-2 text-xs leading-5 text-forest/50">
+                1 = minimal connection · 5 = core water mission
+              </p>
               <div className="rounded-[1.35rem] border border-forest/8 bg-white/72 px-4 py-4">
                 <input
                   type="range"
@@ -1008,7 +1260,20 @@ export default function DiscoveryPage() {
                 />
                 <div className="mt-3 flex items-center justify-between text-sm text-forest/60">
                   <span>1</span>
-                  <span className="font-semibold text-forest">{filters.minMissionAlignment}</span>
+                  <span className="group relative inline-flex justify-center">
+                    <span
+                      tabIndex={0}
+                      className="cursor-help text-center font-semibold text-forest focus-visible:outline-none"
+                    >
+                      {ALIGNMENT_LABELS[filters.minMissionAlignment]}
+                    </span>
+                    <span
+                      role="tooltip"
+                      className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 w-64 -translate-x-1/2 rounded-[1.1rem] border border-forest/10 bg-[#f6f0e5] px-3 py-3 text-left text-xs leading-5 text-forest opacity-0 shadow-[0_18px_36px_rgba(13,48,35,0.16)] transition duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
+                    >
+                      {ALIGNMENT_EXPLANATIONS[filters.minMissionAlignment]}
+                    </span>
+                  </span>
                   <span>5</span>
                 </div>
               </div>
@@ -1016,32 +1281,33 @@ export default function DiscoveryPage() {
 
             <ChecklistFilter
               title="Program Focus"
-              detail="All remain checked by default"
               options={PROGRAM_FOCUS_OPTIONS}
               selected={filters.programFocus}
               onToggle={(value) => toggleFilterListValue('programFocus', value, PROGRAM_FOCUS_OPTIONS)}
+              descriptions={PROGRAM_FOCUS_DESCRIPTIONS}
             />
 
             <ChecklistFilter
               title="Website Mission Match"
-              detail="Treat missing values as Not available"
               options={WEBSITE_MATCH_OPTIONS}
               selected={filters.websiteMissionMatch}
               onToggle={(value) => toggleFilterListValue('websiteMissionMatch', value, WEBSITE_MATCH_OPTIONS)}
+              descriptions={WEBSITE_MATCH_DESCRIPTIONS}
             />
 
             <div>
-              <FieldLabel title="Data Quality Gate" detail="Applies to Top Matches and Manual Review" />
+              <FieldLabel title="Data Quality Gate" />
               <div className="space-y-2 rounded-[1.35rem] border border-forest/8 bg-white/72 px-4 py-4">
                 {CONFIDENCE_OPTIONS.map((option) => (
-                  <label key={option.value} className="flex cursor-pointer items-center gap-3 text-sm text-forest">
+                  <label key={option.value} className="flex cursor-pointer items-start gap-3 rounded-[1rem] px-2 py-2 text-sm text-forest transition hover:bg-forest/4">
                     <input
                       type="radio"
                       name="confidence-band"
                       checked={filters.confidenceBand === option.value}
                       onChange={() => updateFilter('confidenceBand', option.value)}
+                      className="mt-1"
                     />
-                    <span>{option.label}</span>
+                    <span className="block leading-6">{option.label}</span>
                   </label>
                 ))}
               </div>
@@ -1111,19 +1377,31 @@ export default function DiscoveryPage() {
               {activeTab === 'topMatches' ? (
                 topMatches.length ? (
                   topMatches.map((org) => (
-                    <TopMatchCard
-                      key={org.ein}
-                      org={org}
-                      score={org.computedOverallScore}
-                      saved={shortlistedEins.has(org.ein)}
-                      onOpen={(item) => {
-                        openOrg(item)
-                        scrollToSection('selected-organization-panel', 200)
-                      }}
-                      onToggleShortlist={handleToggleShortlist}
-                      helperText="Top Matches are sorted by the live weighted score, then by mission alignment."
-                      actionLabel={shortlistedEins.has(org.ein) ? 'Remove from Shortlist' : 'Save to Shortlist'}
-                    />
+                    <div key={org.ein} className="space-y-4">
+                      <TopMatchCard
+                        org={org}
+                        score={org.computedOverallScore}
+                        saved={shortlistedEins.has(org.ein)}
+                        onOpen={(item) => openOrg(item)}
+                        onToggleShortlist={handleToggleShortlist}
+                        helperText="Top Matches are sorted by the live weighted score, then by mission alignment."
+                        actionLabel={shortlistedEins.has(org.ein) ? 'Remove from Shortlist' : 'Save to Shortlist'}
+                      />
+                      {selectedOrg?.ein === org.ein ? (
+                        <SelectedOrgPanel
+                          selectedOrg={selectedOrg}
+                          shortlistedEins={shortlistedEins}
+                          revealedExplanation={revealedExplanation}
+                          loadingPanel={loadingPanel}
+                          handleGenerateExplanation={handleGenerateExplanation}
+                          handleToggleShortlist={handleToggleShortlist}
+                          setSelectedOrg={setSelectedOrg}
+                          notes={notes}
+                          setNotes={setNotes}
+                          saveNote={saveNote}
+                        />
+                      ) : null}
+                    </div>
                   ))
                 ) : (
                   <EmptyState
@@ -1149,14 +1427,25 @@ export default function DiscoveryPage() {
                         org={org}
                         score={org.computedOverallScore}
                         saved={shortlistedEins.has(org.ein)}
-                        onOpen={(item) => {
-                          openOrg(item)
-                          scrollToSection('selected-organization-panel', 200)
-                        }}
+                        onOpen={(item) => openOrg(item)}
                         onToggleShortlist={handleToggleShortlist}
                         helperText="Manual Review cards are sorted by mission alignment first. Score is shown for reference only."
                         actionLabel={shortlistedEins.has(org.ein) ? 'Remove from Shortlist' : 'Save to Shortlist'}
                       />
+                      {selectedOrg?.ein === org.ein ? (
+                        <SelectedOrgPanel
+                          selectedOrg={selectedOrg}
+                          shortlistedEins={shortlistedEins}
+                          revealedExplanation={revealedExplanation}
+                          loadingPanel={loadingPanel}
+                          handleGenerateExplanation={handleGenerateExplanation}
+                          handleToggleShortlist={handleToggleShortlist}
+                          setSelectedOrg={setSelectedOrg}
+                          notes={notes}
+                          setNotes={setNotes}
+                          saveNote={saveNote}
+                        />
+                      ) : null}
                     </div>
                   ))}
                 </div>
@@ -1201,9 +1490,11 @@ export default function DiscoveryPage() {
                               <NotebookPen className="h-4 w-4" />
                               Reviewer Notes
                             </p>
-                            <p className="mt-2 text-sm leading-6 text-forest/72">{notes[org.ein]}</p>
-                          </div>
-                        ) : null}
+                          <p className="mt-2 max-w-[42rem] text-sm leading-6 text-forest/72" style={{ textWrap: 'pretty' }}>
+                            {notes[org.ein]}
+                          </p>
+                        </div>
+                      ) : null}
                       </div>
                     ))
                   ) : (
@@ -1218,173 +1509,6 @@ export default function DiscoveryPage() {
             </div>
           </Surface>
 
-          {selectedOrg ? (
-            <Surface id="selected-organization-panel" className="px-5 py-5 sm:px-6">
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <p className="eyebrow mb-2">Selected organization</p>
-                  <h2 className="font-cta text-4xl text-forest">{selectedOrg.name}</h2>
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <Badge tone="grove">{selectedOrg.sector}</Badge>
-                    {selectedOrg.maturityTier ? <Badge tone="sky">{selectedOrg.maturityTier}</Badge> : null}
-                    {selectedOrg.state ? <Badge>{selectedOrg.state}</Badge> : null}
-                    <ConfidencePill band={selectedOrg.confidenceBand} />
-                    {normalizedEligibilityLabel(selectedOrg) ? <Badge tone="sun">{normalizedEligibilityLabel(selectedOrg)}</Badge> : null}
-                  </div>
-                  {selectedOrg.missionSummary ? (
-                    <p className="mt-5 max-w-4xl border-l-4 border-sun pl-4 text-[1.05rem] leading-8 text-forest/72">{selectedOrg.missionSummary}</p>
-                  ) : null}
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setSelectedOrg(null)}
-                  className="flex h-12 w-12 items-center justify-center rounded-full border border-forest/10 bg-white/70 text-forest transition hover:bg-white"
-                  aria-label="Close organization details"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-
-              <div className="mt-6 grid gap-5 xl:grid-cols-[minmax(0,1.35fr),minmax(320px,0.9fr)]">
-                <div className="space-y-5">
-                  <div className="rounded-[1.5rem] border border-forest/8 bg-white/72 px-4 py-4">
-                    <p className="text-[0.7rem] uppercase tracking-[0.18em] text-forest/52">Data confidence</p>
-                    <div className="mt-3 flex items-center gap-3">
-                      <span className={`h-3 w-3 rounded-full ${selectedOrg.confidenceBand === 'HIGH' ? 'bg-grove' : selectedOrg.confidenceBand === 'MEDIUM' ? 'bg-sun' : 'bg-ember'}`} />
-                      <p className="font-semibold text-forest">{selectedOrg.confidenceBand}</p>
-                    </div>
-                    <p className="mt-3 text-sm leading-6 text-forest/72">{getConfidenceMeaning(selectedOrg.confidenceBand)}</p>
-                  </div>
-
-                  <div className="rounded-[1.5rem] border border-forest/8 bg-white/72 px-4 py-4">
-                    <p className="text-[0.7rem] uppercase tracking-[0.18em] text-forest/52">Mission profile</p>
-                    <div className="mt-4 grid gap-3 md:grid-cols-2">
-                      <InfoBlock title="Mission Alignment" body={`${selectedOrg.missionAlignmentScore || 0}/5 · ${selectedOrg.missionAlignmentRationale || 'No rationale provided.'}`} />
-                      <InfoBlock title="Program Focus" body={`${selectedOrg.programFocus || 'Not available'}${selectedOrg.programFocusRationale ? ` · ${selectedOrg.programFocusRationale}` : ''}`} />
-                      <InfoBlock title="Geographic Scope" body={selectedOrg.geographicScope || 'Not available'} />
-                      <InfoBlock title="Website Match" body={`${selectedOrg.websiteMissionMatch || 'Not available'}${selectedOrg.websiteRecentActivity ? ` · ${selectedOrg.websiteRecentActivity}` : ''}`} />
-                    </div>
-                    {selectedOrg.websiteUrl ? (
-                      <a href={selectedOrg.websiteUrl} target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-pine hover:text-forest">
-                        Visit Website
-                        <ExternalLink className="h-4 w-4" />
-                      </a>
-                    ) : null}
-                  </div>
-
-                  <div className="rounded-[1.7rem] border border-white/8 bg-forest px-5 py-5 text-cream shadow-lift">
-                    <div className="flex flex-col gap-4">
-                      <div className="flex items-center gap-2">
-                        <Sparkles className="h-4 w-4 text-sun" />
-                        <p className="font-cta text-lg text-cream">AI Explanation</p>
-                      </div>
-                      {revealedExplanation[selectedOrg.ein] ? (
-                        <>
-                          <p className="text-sm leading-7 text-cream/86">
-                            {selectedOrg.capacityNarrative || 'Capacity narrative not yet generated for this organization.'}
-                          </p>
-                          {selectedOrg.missionStatement ? (
-                            <div className="rounded-[1.2rem] border border-white/12 bg-white/8 px-4 py-4">
-                              <p className="text-xs uppercase tracking-[0.18em] text-cream/58">Mission statement</p>
-                              <p className="mt-2 text-sm leading-6 text-cream/82">{selectedOrg.missionStatement}</p>
-                            </div>
-                          ) : null}
-                        </>
-                      ) : (
-                        <div className="space-y-4">
-                          <p className="text-sm leading-7 text-cream/78">
-                            Generate the capacity-focused narrative for this organization when you are ready to inspect the reasoning.
-                          </p>
-                          <Button onClick={() => handleGenerateExplanation(selectedOrg)} disabled={loadingPanel}>
-                            {loadingPanel ? 'Generating...' : 'Generate explanation'}
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {selectedOrg.rawMetrics?.filingContinuityAdjustedNote ? (
-                    <div className="rounded-[1.35rem] border border-sky/20 bg-sky/8 px-4 py-4">
-                      <p className="font-semibold text-forest">Filing Continuity Adjusted</p>
-                      <p className="mt-2 text-sm leading-6 text-forest/72">{selectedOrg.rawMetrics.filingContinuityAdjustedNote}</p>
-                      <p className="mt-2 text-xs text-forest/55">
-                        Score uses adjusted figure. Raw: {selectedOrg.rawMetrics.filingContinuityRaw ?? '—'}% → Adjusted: {selectedOrg.rawMetrics.filingContinuityAdjusted ?? '—'}%
-                      </p>
-                    </div>
-                  ) : null}
-
-                  <details className="rounded-[1.35rem] border border-forest/8 bg-white/72 px-4 py-4">
-                    <summary className="cursor-pointer list-none font-cta text-sm text-forest">
-                      <span className="inline-flex items-center gap-2">
-                        Source Data
-                        <ChevronDown className="h-4 w-4" />
-                      </span>
-                    </summary>
-                    <div className="mt-4 grid gap-3 text-sm leading-6 text-forest/72">
-                      {selectedOrg.program1Desc ? <InfoBlock title="Program 1" body={selectedOrg.program1Desc} /> : null}
-                      {selectedOrg.program2Desc ? <InfoBlock title="Program 2" body={selectedOrg.program2Desc} /> : null}
-                      {selectedOrg.program3Desc ? <InfoBlock title="Program 3" body={selectedOrg.program3Desc} /> : null}
-                      {selectedOrg.scheduleO ? <InfoBlock title="Schedule O / Narrative" body={selectedOrg.scheduleO} /> : null}
-                      {selectedOrg.websiteTextExcerpt ? <InfoBlock title="Website Excerpt" body={selectedOrg.websiteTextExcerpt} /> : null}
-                    </div>
-                  </details>
-
-                  {selectedOrg.hardRedFlags ? (
-                    <div className="rounded-[1.35rem] border border-ember/28 bg-ember/8 px-4 py-4">
-                      <p className="font-semibold text-ember">Hard Red Flag</p>
-                      <p className="mt-2 text-sm leading-6 text-forest/72">{selectedOrg.hardRedFlags}</p>
-                    </div>
-                  ) : null}
-
-                  {selectedOrg.softFlags ? (
-                    <div className="rounded-[1.35rem] border border-sun/30 bg-sun/10 px-4 py-4">
-                      <p className="font-semibold text-forest">Soft Flag</p>
-                      <p className="mt-2 text-sm leading-6 text-forest/72">{selectedOrg.softFlags}</p>
-                    </div>
-                  ) : null}
-                </div>
-
-                <div className="space-y-5">
-                  <div className="rounded-[1.7rem] border border-white/8 bg-forest px-5 py-5 text-cream shadow-lift">
-                    <div className="mb-4 flex items-center gap-2">
-                      <ShieldCheck className="h-4 w-4 text-sun" />
-                      <p className="font-cta text-lg text-cream">Human evaluation reminders</p>
-                    </div>
-                    <div className="space-y-3">
-                      {HUMAN_REVIEW_STEPS.map((_, index) => (
-                        <ReviewerReminderCard key={HUMAN_REVIEW_STEPS[index].key} step={index} org={selectedOrg} />
-                      ))}
-                    </div>
-                    <div className="mt-5">
-                      <Button variant={shortlistedEins.has(selectedOrg.ein) ? 'secondary' : 'primary'} onClick={() => handleToggleShortlist(selectedOrg)}>
-                        {shortlistedEins.has(selectedOrg.ein) ? 'Remove from Shortlist' : 'Save to Shortlist'}
-                      </Button>
-                      <p className="mt-3 text-xs text-cream/64">
-                        Review the checkpoints above, then save when you&apos;re comfortable moving forward.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="rounded-[1.5rem] border border-forest/8 bg-white/72 px-4 py-4">
-                    <label className="font-cta text-sm text-forest">Reviewer Notes</label>
-                    <textarea
-                      value={selectedNote}
-                      onChange={(event) =>
-                        setNotes((current) => ({ ...current, [selectedOrg.ein]: event.target.value }))
-                      }
-                      rows={7}
-                      placeholder="Add your notes after reviewing the checkpoints above..."
-                      className="brand-input mt-3 min-h-[170px] resize-y"
-                    />
-                    <div className="mt-3 flex justify-end">
-                      <Button onClick={saveNote}>Save Notes</Button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </Surface>
-          ) : null}
         </div>
       </section>
 
@@ -1402,16 +1526,21 @@ export default function DiscoveryPage() {
   )
 }
 
-function ChecklistFilter({ title, detail, options, selected, onToggle }) {
+function ChecklistFilter({ title, options, selected, onToggle, descriptions }) {
   return (
     <div>
-      <FieldLabel title={title} detail={detail} />
+      <FieldLabel title={title} />
       <div className="rounded-[1.35rem] border border-forest/8 bg-white/72 px-4 py-4">
         <div className="grid gap-2">
           {options.map((option) => (
-            <label key={option} className="flex cursor-pointer items-center gap-3 text-sm text-forest">
-              <input type="checkbox" checked={selected.includes(option)} onChange={() => onToggle(option)} />
-              <span>{option}</span>
+            <label key={option} className="flex cursor-pointer items-start gap-3 rounded-[1rem] px-2 py-2 text-sm text-forest transition hover:bg-forest/4">
+              <input type="checkbox" checked={selected.includes(option)} onChange={() => onToggle(option)} className="mt-1" />
+              <span className="min-w-0">
+                <span className="block font-medium text-forest">{option}</span>
+                {descriptions?.[option] ? (
+                  <span className="mt-1 block text-xs leading-5 text-forest/62">{descriptions[option]}</span>
+                ) : null}
+              </span>
             </label>
           ))}
         </div>
@@ -1423,8 +1552,12 @@ function ChecklistFilter({ title, detail, options, selected, onToggle }) {
 function InfoBlock({ title, body }) {
   return (
     <div className="rounded-[1.2rem] bg-forest/4 px-4 py-4">
-      <p className="text-xs uppercase tracking-[0.16em] text-forest/52">{title}</p>
-      <p className="mt-2 text-sm leading-6 text-forest/72">{body}</p>
+      <p className="max-w-[12rem] text-xs uppercase tracking-[0.16em] text-forest/52" style={{ textWrap: 'balance' }}>
+        {title}
+      </p>
+      <p className="mt-2 max-w-[22rem] text-sm leading-6 text-forest/72" style={{ textWrap: 'pretty' }}>
+        {body}
+      </p>
     </div>
   )
 }

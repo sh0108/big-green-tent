@@ -34,7 +34,11 @@ export function Badge({ children, tone = 'default' }) {
     sky: 'border-sky/25 bg-sky/10 text-forest',
   }[tone]
 
-  return <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${toneClass}`}>{children}</span>
+  return (
+    <span className={`inline-flex items-center justify-center rounded-full border px-3 py-1 text-xs font-semibold leading-none ${toneClass}`}>
+      {children}
+    </span>
+  )
 }
 
 export function TabButton({ active, count, children, ...props }) {
@@ -55,7 +59,12 @@ export function TabButton({ active, count, children, ...props }) {
 export function FieldLabel({ title, detail }) {
   return (
     <div className="mb-2 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between sm:gap-3">
-      <label className="font-cta text-sm text-forest">{title}</label>
+      <label
+        className="font-cta text-sm leading-6 text-forest sm:max-w-[11.5rem]"
+        style={{ textWrap: 'balance' }}
+      >
+        {title}
+      </label>
       {detail ? <span className="text-xs text-forest/50">{detail}</span> : null}
     </div>
   )

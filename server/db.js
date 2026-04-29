@@ -22,10 +22,31 @@ function ensureMigrations(database) {
   const approvedCols = new Set(
     database.prepare('PRAGMA table_info(approved_organizations)').all().map((col) => col.name)
   )
+  const orgCols = new Set(
+    database.prepare('PRAGMA table_info(organizations)').all().map((col) => col.name)
+  )
 
   if (!approvedCols.has('org_ein')) {
     database.exec('ALTER TABLE approved_organizations ADD COLUMN org_ein TEXT')
   }
+
+  const rawMetricColumns = [
+    ['daysCashOnHand', 'REAL'],
+    ['monthsUnrestricted', 'REAL'],
+    ['currentRatio', 'REAL'],
+    ['surplusDeficit3yr', 'TEXT'],
+    ['revenueTrend', 'TEXT'],
+    ['revConcentrationPct', 'REAL'],
+    ['earnedIncomePct', 'REAL'],
+    ['programExpenseRatio', 'REAL'],
+    ['fundraisingEfficiency', 'REAL'],
+  ]
+
+  rawMetricColumns.forEach(([name, type]) => {
+    if (!orgCols.has(name)) {
+      database.exec(`ALTER TABLE organizations ADD COLUMN ${name} ${type}`)
+    }
+  })
 
   database.exec(`
     CREATE INDEX IF NOT EXISTS idx_organizations_inScope ON organizations(inScope);

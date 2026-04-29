@@ -51,6 +51,15 @@ const INSERT_SQL = `
     filingContinuityRaw,
     filingContinuityAdjusted,
     filingContinuityAdjustedNote,
+    daysCashOnHand,
+    monthsUnrestricted,
+    currentRatio,
+    surplusDeficit3yr,
+    revenueTrend,
+    revConcentrationPct,
+    earnedIncomePct,
+    programExpenseRatio,
+    fundraisingEfficiency,
     currentRevenue,
     yearsActive,
     boardSize,
@@ -101,6 +110,15 @@ const INSERT_SQL = `
     @filingContinuityRaw,
     @filingContinuityAdjusted,
     @filingContinuityAdjustedNote,
+    @daysCashOnHand,
+    @monthsUnrestricted,
+    @currentRatio,
+    @surplusDeficit3yr,
+    @revenueTrend,
+    @revConcentrationPct,
+    @earnedIncomePct,
+    @programExpenseRatio,
+    @fundraisingEfficiency,
     @currentRevenue,
     @yearsActive,
     @boardSize,
@@ -175,6 +193,15 @@ function flattenOrg(org, inScope) {
     filingContinuityRaw: safeNumber(rawMetrics.filingContinuityRaw),
     filingContinuityAdjusted: safeNumber(rawMetrics.filingContinuityAdjusted),
     filingContinuityAdjustedNote: safeText(rawMetrics.filingContinuityAdjustedNote),
+    daysCashOnHand: safeNumber(rawMetrics.daysCashOnHand),
+    monthsUnrestricted: safeNumber(rawMetrics.monthsUnrestricted),
+    currentRatio: safeNumber(rawMetrics.currentRatio),
+    surplusDeficit3yr: safeText(rawMetrics.surplusDeficit3yr),
+    revenueTrend: safeText(rawMetrics.revenueTrend),
+    revConcentrationPct: safeNumber(rawMetrics.revConcentrationPct),
+    earnedIncomePct: safeNumber(rawMetrics.earnedIncomePct),
+    programExpenseRatio: safeNumber(rawMetrics.programExpenseRatio),
+    fundraisingEfficiency: safeNumber(rawMetrics.fundraisingEfficiency),
     currentRevenue: safeNumber(rawMetrics.currentRevenue),
     yearsActive: safeNumber(rawMetrics.yearsActive),
     boardSize: safeNumber(rawMetrics.boardSize),
@@ -183,9 +210,6 @@ function flattenOrg(org, inScope) {
 }
 
 export function seedIfEmpty(db) {
-  const { cnt } = db.prepare('SELECT COUNT(*) AS cnt FROM organizations').get()
-  if (cnt > 0) return false
-
   const raw = fs.readFileSync(DATA_PATH, 'utf8')
   const data = JSON.parse(raw)
   const rows = [
@@ -193,10 +217,17 @@ export function seedIfEmpty(db) {
     ...(data.manualReviewOrgs || []).map((org) => flattenOrg(org, false)),
   ]
 
+  const { cnt } = db.prepare('SELECT COUNT(*) AS cnt FROM organizations').get()
   const insert = db.prepare(INSERT_SQL)
   const insertMany = db.transaction((records) => {
     records.forEach((record) => insert.run(record))
   })
+
+  if (cnt > 0) {
+    insertMany(rows)
+    console.log(`Synced ${rows.length} organizations from bgt_orgs_data_v2.json.`)
+    return false
+  }
 
   insertMany(rows)
   console.log(`Seeded ${rows.length} organizations from bgt_orgs_data_v2.json.`)

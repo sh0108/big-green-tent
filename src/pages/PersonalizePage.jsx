@@ -67,14 +67,14 @@ const KIT_FIELDS = [
   },
 ]
 
-const METRIC_FIELDS = [
-  ['program_efficiency', 'Efficiency'],
-  ['revenue_growth', 'Growth'],
-  ['sustainability', 'Sustainability'],
-  ['scale', 'Scale'],
-  ['grant_distribution', 'Grant Reach'],
-  ['geographic_reach', 'Footprint'],
-  ['innovation_output', 'Innovation'],
+const METHODOLOGY_COPY =
+  "Every organization in our pipeline is evaluated across four capacity dimensions — Financial Stability, Revenue Health, Operational Efficiency, and Organizational Maturity — each scored against IRS Form 990 data and calibrated to the organization's maturity stage. Every profile is also reviewed by at least one human reviewer before being recommended for the expert vetting stage."
+
+const CAPACITY_METRIC_FIELDS = [
+  ['financialStability', 'Financial Stability', '#2D915F'],
+  ['revenueHealth', 'Revenue Health', '#4FA2DB'],
+  ['operationalEfficiency', 'Operational Efficiency', '#F4C148'],
+  ['organizationalMaturity', 'Org. Maturity', '#8E7BE8'],
 ]
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
@@ -91,7 +91,7 @@ function initKit(org) {
   return {
     aboutHeadline: `Big Green Tent × ${org.name}`,
     aboutBgt: `Big Green Tent is a reviewer workspace for institutional donors focused on the environmental sector. We curate, vet, and coordinate shortlists of high-trust nonprofits working on climate, conservation, and community impact.`,
-    methodology: `Every organization in our pipeline is evaluated on seven metrics: program efficiency, revenue growth, sustainability, scale, grant distribution, geographic reach, and innovation output. Each profile is also reviewed by at least one human reviewer before being recommended to our donor network.`,
+    methodology: METHODOLOGY_COPY,
     whySelected: `${org.name} was shortlisted for its alignment with our environmental focus and the strength of its mission in ${org.sector}.${enrichment}`,
     offer: `Partner organizations gain visibility inside our donor coordination workflow, access to donor introductions prepared by vetted reviewers, and periodic impact syntheses that help reviewers contextualize your work for funders.`,
     nextSteps: `Share your most recent annual report, any program updates, and a preferred point of contact for ongoing coordination. We would welcome a short introductory call to discuss possible alignment.`,
@@ -133,6 +133,103 @@ function buildPlainEmail(email) {
   ].join('\n')
 }
 
+function getCapacityScore(org, key) {
+  const direct = org.scores?.[key]?.score
+  if (direct != null) return Math.round(Number(direct))
+
+  const fallbackKeys = {
+    financialStability: 'scoreFinancialStability',
+    revenueHealth: 'scoreRevenueHealth',
+    operationalEfficiency: 'scoreOperationalEfficiency',
+    organizationalMaturity: 'scoreOrganizationalMaturity',
+  }
+  const fallback = org[fallbackKeys[key]]
+  return fallback != null ? Math.round(Number(fallback)) : null
+}
+
+function hasValue(value) {
+  return value !== null && value !== undefined && value !== '' && Number.isFinite(Number(value))
+}
+
+function formatNumber(value, digits = 1) {
+  if (!hasValue(value)) return null
+  const rounded = Number(value).toFixed(digits)
+  return rounded.replace(/\.0$/, '')
+}
+
+function formatPercent(value, digits = 0) {
+  const formatted = formatNumber(value, digits)
+  return formatted ? `${formatted}%` : null
+}
+
+function toTitleCase(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/\b([a-z])/g, (match) => match.toUpperCase())
+    .replace(/\bNfp\b/g, 'NFP')
+    .replace(/\bInc\b/g, 'Inc')
+    .replace(/\bIi\b/g, 'II')
+    .replace(/\bIii\b/g, 'III')
+}
+
+function titleCaseOrgNameInText(text, orgName) {
+  if (!text || !orgName) return text
+  const displayName = toTitleCase(orgName)
+  return String(text).replace(new RegExp(orgName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), displayName)
+}
+
+function getRawMetric(org, key) {
+  return org.rawMetrics?.[key] ?? org[key] ?? null
+}
+
+function buildScoreJustification(org, key) {
+  const raw = {
+    monthsUnrestricted: getRawMetric(org, 'monthsUnrestricted'),
+    currentRatio: getRawMetric(org, 'currentRatio'),
+    surplusDeficit3yr: getRawMetric(org, 'surplusDeficit3yr'),
+    daysCashOnHand: getRawMetric(org, 'daysCashOnHand'),
+    revenueTrend: getRawMetric(org, 'revenueTrend'),
+    revConcentrationPct: getRawMetric(org, 'revConcentrationPct'),
+    earnedIncomePct: getRawMetric(org, 'earnedIncomePct'),
+    programExpenseRatio: getRawMetric(org, 'programExpenseRatio'),
+    fundraisingEfficiency: getRawMetric(org, 'fundraisingEfficiency'),
+    filingContinuityAdjusted: getRawMetric(org, 'filingContinuityAdjusted'),
+    filingContinuityRaw: getRawMetric(org, 'filingContinuityRaw'),
+    yearsActive: getRawMetric(org, 'yearsActive'),
+    boardSize: getRawMetric(org, 'boardSize'),
+    latestEmployees: getRawMetric(org, 'latestEmployees'),
+  }
+
+  const builders = {
+    financialStability: () => [
+      hasValue(raw.monthsUnrestricted) ? `${formatNumber(raw.monthsUnrestricted)} months unrestricted` : null,
+      hasValue(raw.currentRatio) ? `ratio ${formatNumber(raw.currentRatio)}` : null,
+      raw.surplusDeficit3yr ? String(raw.surplusDeficit3yr).replace(' surplus', ' surplus years') : null,
+      hasValue(raw.daysCashOnHand) ? `${formatNumber(raw.daysCashOnHand, 0)} days cash` : null,
+    ],
+    revenueHealth: () => [
+      raw.revenueTrend ? `${String(raw.revenueTrend).toLowerCase()} revenue` : null,
+      hasValue(raw.earnedIncomePct) ? `${formatPercent(raw.earnedIncomePct)} earned income` : null,
+      hasValue(raw.revConcentrationPct) ? `${formatPercent(raw.revConcentrationPct)} concentration` : null,
+    ],
+    operationalEfficiency: () => [
+      hasValue(raw.programExpenseRatio) ? `${formatPercent(Number(raw.programExpenseRatio) * 100, 1)} program ratio` : null,
+      hasValue(raw.fundraisingEfficiency) ? `$${formatNumber(raw.fundraisingEfficiency)} raised per $1` : null,
+      hasValue(raw.filingContinuityAdjusted ?? raw.filingContinuityRaw)
+        ? `${formatPercent(raw.filingContinuityAdjusted ?? raw.filingContinuityRaw)} filing continuity`
+        : null,
+    ],
+    organizationalMaturity: () => [
+      hasValue(raw.yearsActive) ? `${formatNumber(raw.yearsActive)} years active` : null,
+      hasValue(raw.boardSize) ? `${formatNumber(raw.boardSize, 0)} board members` : null,
+      hasValue(raw.latestEmployees) ? `${formatNumber(raw.latestEmployees, 0)} employees` : null,
+    ],
+  }
+
+  const parts = (builders[key]?.() || []).filter(Boolean)
+  return parts.length ? parts.slice(0, 3).join(', ') : 'Source metrics unavailable'
+}
+
 // ─── press-kit PDF (brand-kit aligned editorial layout) ─────────────────────
 const BRAND = {
   forest: '#0D3023',
@@ -155,16 +252,6 @@ function PressKitDocument({ org, kit, forPrint = false }) {
   const date = new Date().toLocaleDateString('en-US', {
     year: 'numeric', month: 'long', day: 'numeric',
   })
-
-  const metrics = [
-    ['program_efficiency', 'Efficiency', BRAND.grove],
-    ['revenue_growth', 'Growth', BRAND.pine],
-    ['sustainability', 'Sustainability', BRAND.forest],
-    ['scale', 'Scale', BRAND.sky],
-    ['grant_distribution', 'Grant Reach', BRAND.sun],
-    ['geographic_reach', 'Footprint', BRAND.ember],
-    ['innovation_output', 'Innovation', BRAND.grove],
-  ]
 
   const eyebrowStyle = {
     fontFamily: SANS_BOLD,
@@ -455,7 +542,7 @@ function PressKitDocument({ org, kit, forPrint = false }) {
       <section style={{ padding: '32px 44px', pageBreakInside: 'avoid' }}>
         <p style={{ ...eyebrowStyle, margin: 0 }}>Our Methodology</p>
         <h2 style={{ ...serifHeadline, fontSize: '22pt', lineHeight: 1.05, margin: '8px 0 16px' }}>
-          Seven Signals, One Human Review
+          Four Capacity Dimensions, One Human Review
         </h2>
         <p style={{ ...bodyStyle, marginTop: 0 }}>{kit.methodology}</p>
 
@@ -463,32 +550,34 @@ function PressKitDocument({ org, kit, forPrint = false }) {
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(7, 1fr)',
+            gridTemplateColumns: 'repeat(4, 1fr)',
             gap: '6px',
             marginTop: '18px',
           }}
         >
-          {metrics.map(([key, label, accent]) => {
-            const score = org[key] != null ? Math.round(org[key] * 50) : null
+          {CAPACITY_METRIC_FIELDS.map(([key, label, accent]) => {
+            const score = getCapacityScore(org, key)
             return (
               <div
                 key={key}
                 style={{
                   borderTop: `3px solid ${accent}`,
                   background: '#fff',
-                  padding: '10px 8px',
+                  padding: '12px 6px',
                   borderRadius: '0 0 6px 6px',
                   textAlign: 'center',
+                  minHeight: '108px',
                 }}
               >
                 <p
                   style={{
                     fontFamily: SANS_BOLD,
-                    fontSize: '7pt',
-                    letterSpacing: '0.12em',
+                    fontSize: '5.8pt',
+                    letterSpacing: '0.08em',
                     textTransform: 'uppercase',
                     color: BRAND.soil,
                     margin: 0,
+                    whiteSpace: 'nowrap',
                   }}
                 >
                   {label}
@@ -501,6 +590,17 @@ function PressKitDocument({ org, kit, forPrint = false }) {
                   }}
                 >
                   {score ?? '—'}
+                </p>
+                <p
+                  style={{
+                    fontFamily: SANS,
+                    fontSize: '6.35pt',
+                    lineHeight: 1.25,
+                    color: `${BRAND.soil}b8`,
+                    margin: '6px 0 0',
+                  }}
+                >
+                  {buildScoreJustification(org, key)}
                 </p>
               </div>
             )
@@ -954,15 +1054,17 @@ export default function PersonalizePage() {
           {org.enrichment_summary && (
             <div className="mt-5 rounded-[1.25rem] border border-grove/15 bg-grove/5 px-4 py-3">
               <p className="eyebrow mb-1 text-[0.65rem]">Reviewer Insight</p>
-              <p className="text-sm leading-6 text-forest/80">{org.enrichment_summary}</p>
+              <p className="text-sm leading-6 text-forest/80">
+                {titleCaseOrgNameInText(org.enrichment_summary, org.name)}
+              </p>
             </div>
           )}
 
           {/* Metric grid */}
           <div className="mt-5">
             <p className="eyebrow mb-3">Impact Snapshot</p>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
-              {METRIC_FIELDS.map(([key, label]) => (
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              {CAPACITY_METRIC_FIELDS.map(([key, label]) => (
                 <div
                   key={key}
                   className="rounded-[1.1rem] border border-forest/8 bg-white/70 px-3 py-3 text-center"
@@ -971,9 +1073,20 @@ export default function PersonalizePage() {
                     {label}
                   </p>
                   <p className="mt-1.5 font-cta text-2xl text-forest">
-                    {org[key] != null ? `${(org[key] * 50).toFixed(0)}` : '—'}
+                    {getCapacityScore(org, key) ?? '—'}
                   </p>
                   <p className="text-[0.65rem] text-forest/45">Out Of 100</p>
+                  <p
+                    className="mx-auto mt-2 max-w-[11rem] text-xs leading-5 text-forest/56"
+                    style={{
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {buildScoreJustification(org, key)}
+                  </p>
                 </div>
               ))}
             </div>
