@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { LogOut, ShieldCheck } from 'lucide-react'
+import { CircleUserRound, LogOut, ShieldCheck } from 'lucide-react'
 
 const navItems = [
   { to: '/', label: 'Discovery' },
@@ -44,8 +44,9 @@ export default function AppShell({ children }) {
                 <ShieldCheck className="h-3.5 w-3.5 text-grove" />
                 Reviewer Access
               </div>
-              <div className="rounded-full border border-forest/10 bg-white/72 px-4 py-2 text-sm text-forest/72 whitespace-nowrap">
-                Alex Morgan
+              <div className="flex items-center gap-2 rounded-full border border-forest/10 bg-white/72 px-4 py-2 text-sm text-forest/72 whitespace-nowrap">
+                <CircleUserRound className="h-4 w-4 text-forest/58" />
+                Jane Smith
               </div>
               <button className="brand-button-secondary px-4 py-2 whitespace-nowrap" type="button" aria-label="Log out">
                 <LogOut className="mr-2 h-4 w-4" />

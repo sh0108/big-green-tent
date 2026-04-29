@@ -94,25 +94,12 @@ export default function AdminPage() {
       return acc
     }, {})
     const topSector = Object.entries(sectorCounts).sort((a, b) => b[1] - a[1])[0]
-    const metricKeys = [
-      'program_efficiency',
-      'revenue_growth',
-      'sustainability',
-      'scale',
-      'grant_distribution',
-      'geographic_reach',
-      'innovation_output',
-    ]
-    const scores = approvedOrgs.map((org) => {
-      const vals = metricKeys.map((k) => Number(org[k]) || 0)
-      const avg = vals.reduce((s, v) => s + v, 0) / vals.length
-      return Math.max(0, Math.min(100, avg * 50))
-    })
+    const scores = approvedOrgs.map((org) => Number(org.scoreOverall) || 0).filter((score) => score > 0)
     const avgScore = scores.reduce((s, v) => s + v, 0) / scores.length
     return {
       sectors: Object.keys(sectorCounts).length,
       topSector: topSector ? { name: topSector[0], count: topSector[1] } : null,
-      avgScore: Math.round(avgScore),
+      avgScore: Number.isFinite(avgScore) ? Math.round(avgScore) : null,
     }
   }, [approvedOrgs])
 
@@ -178,7 +165,7 @@ export default function AdminPage() {
           />
           <StatTile
             icon={<Gauge className="h-4 w-4" />}
-            label="Avg readiness"
+            label="AVG MATCH SCORE"
             value={stats ? `${stats.avgScore}` : '—'}
             sub={stats ? 'out of 100' : null}
             accent="sky"
@@ -324,7 +311,7 @@ export default function AdminPage() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.05 }}
-              key={org.id}
+              key={org.approval_id || org.ein}
               className="grid gap-4 rounded-[1.8rem] border border-forest/8 bg-white/72 px-5 py-5 shadow-soft lg:grid-cols-[minmax(0,1fr),auto] lg:items-center sm:px-6"
             >
               <div className="flex items-start gap-4">
@@ -336,7 +323,7 @@ export default function AdminPage() {
                     <h3 className="font-cta text-2xl text-forest">{org.name}</h3>
                     <Badge tone="grove">{org.sector}</Badge>
                   </div>
-                  <p className="body-copy mt-2 max-w-3xl">{org.mission}</p>
+                  <p className="body-copy mt-2 max-w-3xl">{org.missionSummary || org.missionStatement || 'Mission summary not available yet.'}</p>
                   <div className="mt-4 flex flex-wrap gap-2">
                     <span className="stat-pill">Approved For Outreach</span>
                     <span className="stat-pill">Discovery Shortlisting Preserved</span>

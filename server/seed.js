@@ -1,114 +1,204 @@
-/**
- * Database seeder – inserts 5 mock nonprofits if the table is empty.
- */
-import crypto from 'crypto'
+import fs from 'fs'
+import path from 'path'
 
-const SEED_DATA = [
-  {
-    name: 'Coastal Resilience Alliance',
-    mission: 'Protecting coastal communities from rising sea levels.',
-    sector: 'Climate Change & Adaptation',
-    maturity: 'Established',
-    program_efficiency: 0.85,
-    revenue_growth: 0.12,
-    sustainability: 0.90,
-    scale: 0.75,
-    grant_distribution: 0.60,
-    geographic_reach: 0.80,
-    innovation_output: 0.40,
-    location: 'Miami, FL'
-  },
-  {
-    name: 'GreenGrid Energy Fund',
-    mission: 'Investing in renewable energy infrastructure.',
-    sector: 'Energy Systems',
-    maturity: 'Mature',
-    program_efficiency: 0.92,
-    revenue_growth: 0.25,
-    sustainability: 0.88,
-    scale: 0.95,
-    grant_distribution: 0.85,
-    geographic_reach: 0.90,
-    innovation_output: 0.70,
-    location: 'San Francisco, CA'
-  },
-  {
-    name: 'Watershed Commons',
-    mission: 'Restoring and protecting local watersheds.',
-    sector: 'Water Systems & Marine & Coastal Ecosystems',
-    maturity: 'Emerging',
-    program_efficiency: 0.78,
-    revenue_growth: 0.40,
-    sustainability: 0.85,
-    scale: 0.45,
-    grant_distribution: 0.50,
-    geographic_reach: 0.35,
-    innovation_output: 0.65,
-    location: 'Portland, OR'
-  },
-  {
-    name: 'EcoAction Network',
-    mission: 'Community-driven waste reduction programs.',
-    sector: 'Industrial Ecology & Circularity',
-    maturity: 'Emerging',
-    program_efficiency: 0.80,
-    revenue_growth: 0.50,
-    sustainability: 0.82,
-    scale: 0.30,
-    grant_distribution: 0.40,
-    geographic_reach: 0.20,
-    innovation_output: 0.85,
-    location: 'Austin, TX'
-  },
-  {
-    name: 'Solar Future Foundation',
-    mission: 'Providing solar panels to low-income neighborhoods.',
-    sector: 'Energy Systems',
-    maturity: 'Established',
-    program_efficiency: 0.89,
-    revenue_growth: 0.15,
-    sustainability: 0.95,
-    scale: 0.60,
-    grant_distribution: 0.75,
-    geographic_reach: 0.85,
-    innovation_output: 0.90,
-    location: 'Phoenix, AZ'
+const DATA_PATH = path.resolve('server', 'bgt_orgs_data_v2.json')
+const DEFAULT_SECTOR = 'Water Systems & Marine & Coastal Ecosystems'
+
+const INSERT_SQL = `
+  INSERT OR REPLACE INTO organizations (
+    ein,
+    name,
+    state,
+    region,
+    sector,
+    maturityTier,
+    inScope,
+    eligibilityFlag,
+    eligibilityFlagLabel,
+    confidenceBand,
+    missionAlignmentScore,
+    missionAlignmentRationale,
+    programFocus,
+    programFocusRationale,
+    websiteMissionMatch,
+    websiteRecentActivity,
+    websiteConsistencySignal,
+    websiteStatus,
+    websiteUrl,
+    capacityNarrative,
+    missionSummary,
+    primaryPrograms,
+    geographicScope,
+    notableSignals,
+    riskSignals,
+    hardRedFlags,
+    softFlags,
+    missionStatement,
+    program1Desc,
+    program2Desc,
+    program3Desc,
+    scheduleO,
+    websiteTextExcerpt,
+    scoreFinancialStability,
+    scoreRevenueHealth,
+    scoreOperationalEfficiency,
+    scoreOrganizationalMaturity,
+    scoreOverall,
+    colorFinancialStability,
+    colorRevenueHealth,
+    colorOperationalEfficiency,
+    colorOrganizationalMaturity,
+    filingContinuityRaw,
+    filingContinuityAdjusted,
+    filingContinuityAdjustedNote,
+    currentRevenue,
+    yearsActive,
+    boardSize,
+    latestEmployees
+  ) VALUES (
+    @ein,
+    @name,
+    @state,
+    @region,
+    @sector,
+    @maturityTier,
+    @inScope,
+    @eligibilityFlag,
+    @eligibilityFlagLabel,
+    @confidenceBand,
+    @missionAlignmentScore,
+    @missionAlignmentRationale,
+    @programFocus,
+    @programFocusRationale,
+    @websiteMissionMatch,
+    @websiteRecentActivity,
+    @websiteConsistencySignal,
+    @websiteStatus,
+    @websiteUrl,
+    @capacityNarrative,
+    @missionSummary,
+    @primaryPrograms,
+    @geographicScope,
+    @notableSignals,
+    @riskSignals,
+    @hardRedFlags,
+    @softFlags,
+    @missionStatement,
+    @program1Desc,
+    @program2Desc,
+    @program3Desc,
+    @scheduleO,
+    @websiteTextExcerpt,
+    @scoreFinancialStability,
+    @scoreRevenueHealth,
+    @scoreOperationalEfficiency,
+    @scoreOrganizationalMaturity,
+    @scoreOverall,
+    @colorFinancialStability,
+    @colorRevenueHealth,
+    @colorOperationalEfficiency,
+    @colorOrganizationalMaturity,
+    @filingContinuityRaw,
+    @filingContinuityAdjusted,
+    @filingContinuityAdjustedNote,
+    @currentRevenue,
+    @yearsActive,
+    @boardSize,
+    @latestEmployees
+  )
+`
+
+function safeText(value) {
+  if (value == null) return null
+  const text = String(value).trim()
+  return text ? text : null
+}
+
+function safeNumber(value) {
+  if (value == null || value === '') return null
+  const num = Number(value)
+  return Number.isFinite(num) ? num : null
+}
+
+function toRiskSignals(value) {
+  if (Array.isArray(value)) return JSON.stringify(value)
+  return JSON.stringify([])
+}
+
+function flattenOrg(org, inScope) {
+  const scores = org.scores || {}
+  const rawMetrics = org.rawMetrics || {}
+
+  return {
+    ein: safeText(org.ein),
+    name: safeText(org.name),
+    state: safeText(org.state),
+    region: safeText(org.region),
+    sector: DEFAULT_SECTOR,
+    maturityTier: safeText(org.maturityTier),
+    inScope: inScope ? 1 : 0,
+    eligibilityFlag: safeText(org.eligibilityFlag),
+    eligibilityFlagLabel: safeText(org.eligibilityFlagLabel),
+    confidenceBand: safeText(org.confidenceBand),
+    missionAlignmentScore: safeNumber(org.missionAlignmentScore),
+    missionAlignmentRationale: safeText(org.missionAlignmentRationale),
+    programFocus: safeText(org.programFocus),
+    programFocusRationale: safeText(org.programFocusRationale),
+    websiteMissionMatch: safeText(org.websiteMissionMatch),
+    websiteRecentActivity: safeText(org.websiteRecentActivity),
+    websiteConsistencySignal: safeText(org.websiteConsistencySignal),
+    websiteStatus: safeText(org.websiteStatus),
+    websiteUrl: safeText(org.websiteUrl),
+    capacityNarrative: safeText(org.capacityNarrative),
+    missionSummary: safeText(org.missionSummary),
+    primaryPrograms: safeText(org.primaryPrograms),
+    geographicScope: safeText(org.geographicScope),
+    notableSignals: safeText(org.notableSignals),
+    riskSignals: toRiskSignals(org.riskSignals),
+    hardRedFlags: safeText(org.hardRedFlags),
+    softFlags: safeText(org.softFlags),
+    missionStatement: safeText(org.missionStatement),
+    program1Desc: safeText(org.program1Desc),
+    program2Desc: safeText(org.program2Desc),
+    program3Desc: safeText(org.program3Desc),
+    scheduleO: safeText(org.scheduleO),
+    websiteTextExcerpt: safeText(org.websiteTextExcerpt),
+    scoreFinancialStability: safeNumber(scores.financialStability?.score),
+    scoreRevenueHealth: safeNumber(scores.revenueHealth?.score),
+    scoreOperationalEfficiency: safeNumber(scores.operationalEfficiency?.score),
+    scoreOrganizationalMaturity: safeNumber(scores.organizationalMaturity?.score),
+    scoreOverall: safeNumber(scores.overallScore),
+    colorFinancialStability: safeText(scores.financialStability?.color),
+    colorRevenueHealth: safeText(scores.revenueHealth?.color),
+    colorOperationalEfficiency: safeText(scores.operationalEfficiency?.color),
+    colorOrganizationalMaturity: safeText(scores.organizationalMaturity?.color),
+    filingContinuityRaw: safeNumber(rawMetrics.filingContinuityRaw),
+    filingContinuityAdjusted: safeNumber(rawMetrics.filingContinuityAdjusted),
+    filingContinuityAdjustedNote: safeText(rawMetrics.filingContinuityAdjustedNote),
+    currentRevenue: safeNumber(rawMetrics.currentRevenue),
+    yearsActive: safeNumber(rawMetrics.yearsActive),
+    boardSize: safeNumber(rawMetrics.boardSize),
+    latestEmployees: safeNumber(rawMetrics.latestEmployees),
   }
-]
+}
 
-/**
- * Seeds the nonprofits table if it is empty.
- * @param {import('better-sqlite3').Database} db
- */
 export function seedIfEmpty(db) {
-  const { cnt } = db.prepare('SELECT COUNT(*) as cnt FROM nonprofits').get()
+  const { cnt } = db.prepare('SELECT COUNT(*) AS cnt FROM organizations').get()
   if (cnt > 0) return false
 
-  const stmt = db.prepare(
-    'INSERT INTO nonprofits (id, name, mission, sector, maturity, program_efficiency, revenue_growth, sustainability, scale, grant_distribution, geographic_reach, innovation_output, location) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-  )
+  const raw = fs.readFileSync(DATA_PATH, 'utf8')
+  const data = JSON.parse(raw)
+  const rows = [
+    ...(data.mainOrgs || []).map((org) => flattenOrg(org, true)),
+    ...(data.manualReviewOrgs || []).map((org) => flattenOrg(org, false)),
+  ]
 
-  const insertMany = db.transaction((rows) => {
-    rows.forEach((row) => {
-      stmt.run(
-        crypto.randomUUID(),
-        row.name,
-        row.mission,
-        row.sector,
-        row.maturity,
-        row.program_efficiency,
-        row.revenue_growth,
-        row.sustainability,
-        row.scale,
-        row.grant_distribution,
-        row.geographic_reach,
-        row.innovation_output,
-        row.location
-      )
-    })
+  const insert = db.prepare(INSERT_SQL)
+  const insertMany = db.transaction((records) => {
+    records.forEach((record) => insert.run(record))
   })
 
-  insertMany(SEED_DATA)
-  console.log(`Seeded ${SEED_DATA.length} mock nonprofits.`)
+  insertMany(rows)
+  console.log(`Seeded ${rows.length} organizations from bgt_orgs_data_v2.json.`)
   return true
 }

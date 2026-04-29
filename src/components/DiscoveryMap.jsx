@@ -3,36 +3,79 @@ import { geoAlbersUsa, geoPath } from 'd3-geo'
 import { feature } from 'topojson-client'
 import { MapPin } from 'lucide-react'
 
-const CITY_COORDS = {
-  'San Diego, CA': [-117.1611, 32.7157],
-  'Newport Beach, CA': [-117.9242, 33.6189],
-  'Erie, PA': [-80.0851, 42.1292],
-  'Apple Valley, MN': [-93.2010, 44.7319],
-  'Houston, TX': [-95.3698, 29.7604],
-  'Palm Springs, CA': [-116.5453, 33.8303],
-  'Ellensburg, WA': [-120.5478, 46.9965],
-  'Chandler, AZ': [-111.8413, 33.3062],
-  'Charlotte, NC': [-80.8431, 35.2271],
-  'Las Vegas, NV': [-115.1398, 36.1699],
-}
-
 const STATE_NAMES = {
-  CA: 'California', PA: 'Pennsylvania', MN: 'Minnesota', TX: 'Texas',
-  WA: 'Washington', AZ: 'Arizona', NC: 'North Carolina', NV: 'Nevada',
+  AK: 'Alaska',
+  AL: 'Alabama',
+  AR: 'Arkansas',
+  AZ: 'Arizona',
+  CA: 'California',
+  CO: 'Colorado',
+  CT: 'Connecticut',
+  DC: 'District of Columbia',
+  FL: 'Florida',
+  GA: 'Georgia',
+  HI: 'Hawaii',
+  IA: 'Iowa',
+  ID: 'Idaho',
+  IL: 'Illinois',
+  IN: 'Indiana',
+  KY: 'Kentucky',
+  MA: 'Massachusetts',
+  MD: 'Maryland',
+  ME: 'Maine',
+  MI: 'Michigan',
+  MN: 'Minnesota',
+  MO: 'Missouri',
+  MS: 'Mississippi',
+  MT: 'Montana',
+  NC: 'North Carolina',
+  ND: 'North Dakota',
+  NE: 'Nebraska',
+  NH: 'New Hampshire',
+  NJ: 'New Jersey',
+  NM: 'New Mexico',
+  NV: 'Nevada',
+  NY: 'New York',
+  OH: 'Ohio',
+  OK: 'Oklahoma',
+  OR: 'Oregon',
+  PA: 'Pennsylvania',
+  RI: 'Rhode Island',
+  SC: 'South Carolina',
+  SD: 'South Dakota',
+  TN: 'Tennessee',
+  TX: 'Texas',
+  UT: 'Utah',
+  VA: 'Virginia',
+  VT: 'Vermont',
+  WA: 'Washington',
+  WI: 'Wisconsin',
+  WY: 'Wyoming',
 }
 
+const NAME_TO_CODE = Object.fromEntries(Object.entries(STATE_NAMES).map(([code, name]) => [name, code]))
 const WIDTH = 960
 const HEIGHT = 540
 
-function parseState(location) {
-  if (!location) return null
-  const match = location.match(/,\s*([A-Z]{2})\s*$/)
-  return match ? match[1] : null
+function hashOffset(seed) {
+  let value = 0
+  const text = String(seed || '')
+  for (let index = 0; index < text.length; index += 1) {
+    value = (value * 31 + text.charCodeAt(index)) % 3600
+  }
+  const angle = (value % 360) * (Math.PI / 180)
+  const radius = 5 + (value % 18)
+  return [Math.cos(angle) * radius, Math.sin(angle) * radius]
 }
 
-export default function DiscoveryMap({ orgs = [], approvedIds = new Set(), onSelectOrg }) {
+export default function DiscoveryMap({
+  orgs = [],
+  approvedIds = new Set(),
+  stateFilter = 'ALL',
+  onStateChange,
+  onSelectOrg,
+}) {
   const [topo, setTopo] = useState(null)
-  const [stateFilter, setStateFilter] = useState('ALL')
   const [hoveredState, setHoveredState] = useState(null)
   const [hoveredOrg, setHoveredOrg] = useState(null)
 
@@ -42,66 +85,72 @@ export default function DiscoveryMap({ orgs = [], approvedIds = new Set(), onSel
       .then((r) => r.json())
       .then((data) => {
         if (cancelled) return
-        const fc = feature(data, data.objects.states)
-        setTopo(fc)
+        setTopo(feature(data, data.objects.states))
       })
-      .catch((err) => console.error('Map load failed:', err))
+      .catch((error) => console.error('Map load failed:', error))
     return () => {
       cancelled = true
     }
   }, [])
 
-  const { projection, pathGen } = useMemo(() => {
-    if (!topo) return { projection: null, pathGen: null }
+  const { pathGen, centroids } = useMemo(() => {
+    if (!topo) return { pathGen: null, centroids: {} }
     const proj = geoAlbersUsa().fitExtent(
       [[20, 20], [WIDTH - 20, HEIGHT - 20]],
-      topo,
+      topo
     )
-    return { projection: proj, pathGen: geoPath(proj) }
+    const geo = geoPath(proj)
+    const nextCentroids = {}
+    topo.features.forEach((shape) => {
+      const code = NAME_TO_CODE[shape.properties?.name]
+      if (!code) return
+      nextCentroids[code] = geo.centroid(shape)
+    })
+    return { pathGen: geo, centroids: nextCentroids }
   }, [topo])
 
-  const orgsWithCoords = useMemo(() => {
-    return orgs
+  const availableStates = useMemo(() => {
+    const counts = {}
+    orgs.forEach((org) => {
+      if (!org.state) return
+      counts[org.state] = (counts[org.state] || 0) + 1
+    })
+    return Object.keys(counts)
+      .sort()
+      .map((code) => ({ code, name: STATE_NAMES[code] || code, count: counts[code] }))
+  }, [orgs])
+
+  const visibleOrgs = useMemo(() => {
+    if (stateFilter === 'ALL') return orgs
+    return orgs.filter((org) => org.state === stateFilter)
+  }, [orgs, stateFilter])
+
+  const markers = useMemo(() => {
+    return visibleOrgs
       .map((org) => {
-        const coords = CITY_COORDS[org.location]
-        if (!coords) return null
-        return { ...org, coords, stateCode: parseState(org.location) }
+        const centroid = centroids[org.state]
+        if (!centroid) return null
+        const [dx, dy] = hashOffset(org.ein)
+        return {
+          ...org,
+          x: centroid[0] + dx,
+          y: centroid[1] + dy,
+          approved: approvedIds.has(org.ein),
+        }
       })
       .filter(Boolean)
-  }, [orgs])
+  }, [approvedIds, centroids, visibleOrgs])
 
   const stateCounts = useMemo(() => {
     const counts = {}
-    orgsWithCoords.forEach((o) => {
-      if (!o.stateCode) return
-      counts[o.stateCode] = (counts[o.stateCode] || 0) + 1
+    orgs.forEach((org) => {
+      if (!org.state) return
+      counts[org.state] = (counts[org.state] || 0) + 1
     })
     return counts
-  }, [orgsWithCoords])
+  }, [orgs])
 
-  const availableStates = useMemo(() => {
-    return Object.keys(stateCounts)
-      .map((code) => ({ code, name: STATE_NAMES[code] || code, count: stateCounts[code] }))
-      .sort((a, b) => b.count - a.count)
-  }, [stateCounts])
-
-  const visibleOrgs = useMemo(() => {
-    if (stateFilter === 'ALL') return orgsWithCoords
-    return orgsWithCoords.filter((o) => o.stateCode === stateFilter)
-  }, [orgsWithCoords, stateFilter])
-
-  const markers = useMemo(() => {
-    if (!projection) return []
-    return visibleOrgs
-      .map((o) => {
-        const p = projection(o.coords)
-        if (!p) return null
-        return { ...o, x: p[0], y: p[1], approved: approvedIds.has(o.id) }
-      })
-      .filter(Boolean)
-  }, [visibleOrgs, projection, approvedIds])
-
-  const approvedCount = markers.filter((m) => m.approved).length
+  const approvedCount = markers.filter((marker) => marker.approved).length
   const candidateCount = markers.length - approvedCount
 
   return (
@@ -123,13 +172,13 @@ export default function DiscoveryMap({ orgs = [], approvedIds = new Set(), onSel
           <select
             id="map-state-filter"
             value={stateFilter}
-            onChange={(e) => setStateFilter(e.target.value)}
+            onChange={(event) => onStateChange && onStateChange(event.target.value)}
             className="brand-input brand-select min-w-[12rem]"
           >
             <option value="ALL">All states</option>
-            {availableStates.map((s) => (
-              <option key={s.code} value={s.code}>
-                {s.name} ({s.count})
+            {availableStates.map((state) => (
+              <option key={state.code} value={state.code}>
+                {state.name} ({state.count})
               </option>
             ))}
           </select>
@@ -154,9 +203,8 @@ export default function DiscoveryMap({ orgs = [], approvedIds = new Set(), onSel
           <rect width={WIDTH} height={HEIGHT} fill="transparent" />
 
           {topo && pathGen
-            ? topo.features.map((f) => {
-                const code = f.properties?.name
-                const stateCode = Object.entries(STATE_NAMES).find(([, name]) => name === code)?.[0]
+            ? topo.features.map((shape) => {
+                const stateCode = NAME_TO_CODE[shape.properties?.name]
                 const hasMatches = stateCode && stateCounts[stateCode]
                 const isFiltered = stateFilter !== 'ALL' && stateCode !== stateFilter
                 const isHovered = hoveredState === stateCode
@@ -168,8 +216,8 @@ export default function DiscoveryMap({ orgs = [], approvedIds = new Set(), onSel
 
                 return (
                   <path
-                    key={f.id}
-                    d={pathGen(f)}
+                    key={shape.id}
+                    d={pathGen(shape)}
                     fill={fill}
                     stroke="#0d3023"
                     strokeOpacity={isFiltered ? 0.08 : 0.18}
@@ -178,45 +226,45 @@ export default function DiscoveryMap({ orgs = [], approvedIds = new Set(), onSel
                     onMouseLeave={() => setHoveredState(null)}
                     style={{ cursor: stateCode ? 'pointer' : 'default', transition: 'fill 120ms ease' }}
                     onClick={() => {
-                      if (!stateCode) return
-                      setStateFilter((curr) => (curr === stateCode ? 'ALL' : stateCode))
+                      if (!stateCode || !onStateChange) return
+                      onStateChange(stateFilter === stateCode ? 'ALL' : stateCode)
                     }}
                   />
                 )
               })
             : null}
 
-          {markers.map((m) => (
-            <g key={m.id} style={{ cursor: 'pointer' }}>
-              <circle cx={m.x} cy={m.y} r="18" fill="url(#map-glow)" pointerEvents="none" />
+          {markers.map((marker) => (
+            <g key={marker.ein} style={{ cursor: 'pointer' }}>
+              <circle cx={marker.x} cy={marker.y} r="18" fill="url(#map-glow)" pointerEvents="none" />
               <circle
-                cx={m.x}
-                cy={m.y}
-                r={hoveredOrg === m.id ? 8 : 6}
-                fill={m.approved ? '#2d915f' : '#f4c146'}
+                cx={marker.x}
+                cy={marker.y}
+                r={hoveredOrg === marker.ein ? 8 : 6}
+                fill={marker.approved ? '#2d915f' : '#f4c146'}
                 stroke="#0d3023"
                 strokeWidth={1.5}
-                onMouseEnter={() => setHoveredOrg(m.id)}
+                onMouseEnter={() => setHoveredOrg(marker.ein)}
                 onMouseLeave={() => setHoveredOrg(null)}
-                onClick={() => onSelectOrg && onSelectOrg(m)}
+                onClick={() => onSelectOrg && onSelectOrg(marker)}
                 style={{ transition: 'r 120ms ease' }}
               />
-              {hoveredOrg === m.id ? (
+              {hoveredOrg === marker.ein ? (
                 <g pointerEvents="none">
                   <rect
-                    x={m.x + 12}
-                    y={m.y - 26}
-                    width={Math.min(260, Math.max(140, m.name.length * 7 + 28))}
-                    height={44}
+                    x={marker.x + 12}
+                    y={marker.y - 26}
+                    width={Math.min(290, Math.max(150, marker.name.length * 7 + 30))}
+                    height={46}
                     rx={10}
                     fill="#0d3023"
                     opacity="0.96"
                   />
-                  <text x={m.x + 22} y={m.y - 10} fill="#f6f0e5" fontSize="13" fontWeight="600">
-                    {m.name.length > 32 ? `${m.name.slice(0, 32)}…` : m.name}
+                  <text x={marker.x + 22} y={marker.y - 10} fill="#f6f0e5" fontSize="13" fontWeight="600">
+                    {marker.name.length > 34 ? `${marker.name.slice(0, 34)}…` : marker.name}
                   </text>
-                  <text x={m.x + 22} y={m.y + 6} fill="#f4c146" fontSize="11" fontWeight="600">
-                    {m.location} · Score {m.score ?? '—'}
+                  <text x={marker.x + 22} y={marker.y + 7} fill="#f4c146" fontSize="11" fontWeight="600">
+                    {marker.state} · Score {marker.computedOverallScore ?? marker.scoreOverall ?? '—'}
                   </text>
                 </g>
               ) : null}
@@ -240,11 +288,8 @@ export default function DiscoveryMap({ orgs = [], approvedIds = new Set(), onSel
 function LegendSwatch({ color, label }) {
   return (
     <span className="inline-flex items-center gap-2">
-      <span
-        className="inline-block h-2.5 w-2.5 rounded-full border border-forest/30"
-        style={{ backgroundColor: color }}
-      />
-      {label}
+      <span className="h-3 w-3 rounded-full" style={{ backgroundColor: color }} />
+      <span>{label}</span>
     </span>
   )
 }
