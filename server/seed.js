@@ -1,5 +1,6 @@
 import fs from 'fs'
 import path from 'path'
+import { calibratedScoresForOrg } from './capacityScoring.js'
 
 const DATA_PATH = path.resolve('server', 'bgt_orgs_data_v2.json')
 const DEFAULT_SECTOR = 'Water Systems & Marine & Coastal Ecosystems'
@@ -144,7 +145,15 @@ function toRiskSignals(value) {
 }
 
 function flattenOrg(org, inScope) {
-  const scores = org.scores || {}
+  const scores = org.eligibilityFlag === 'upstream_data_gap'
+    ? {
+        overallScore: null,
+        financialStability: { score: null, color: null },
+        revenueHealth: { score: null, color: null },
+        operationalEfficiency: { score: null, color: null },
+        organizationalMaturity: { score: null, color: null },
+      }
+    : calibratedScoresForOrg(org)
   const rawMetrics = org.rawMetrics || {}
 
   return {
@@ -215,6 +224,7 @@ export function seedIfEmpty(db) {
   const rows = [
     ...(data.mainOrgs || []).map((org) => flattenOrg(org, true)),
     ...(data.manualReviewOrgs || []).map((org) => flattenOrg(org, false)),
+    ...(data.excludedOrgs || []).map((org) => flattenOrg(org, false)),
   ]
 
   const { cnt } = db.prepare('SELECT COUNT(*) AS cnt FROM organizations').get()

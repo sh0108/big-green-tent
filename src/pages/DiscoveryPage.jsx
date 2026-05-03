@@ -22,7 +22,8 @@ import {
 import { Badge, Button, EmptyState, FieldLabel, Surface, TabButton } from '../components/ui'
 import DiscoveryMap from '../components/DiscoveryMap'
 
-const DEFAULT_SECTOR = 'Water Systems & Marine & Coastal Ecosystems'
+const DEFAULT_SECTOR = 'All sectors'
+const DATASET_PRIMARY_SECTOR = 'Water Systems & Marine & Coastal Ecosystems'
 const SECTOR_OPTIONS = [
   'All sectors',
   'Built Environment & Sustainable Transportation',
@@ -40,7 +41,7 @@ const SECTOR_OPTIONS = [
   'Science, Research & Innovation',
   'Wildlife & Biodiversity',
 ]
-const DEFAULT_SCORE_THRESHOLD = 70
+const DEFAULT_SCORE_THRESHOLD = 0
 const WEBSITE_MATCH_OPTIONS = ['Confirmed', 'Partial', 'Unclear', 'Diverged', 'Not available']
 const PROGRAM_FOCUS_OPTIONS = ['Highly Focused', 'Moderately Focused', 'Diversified', 'Sprawling', 'Tangential']
 const PROGRAM_FOCUS_DESCRIPTIONS = {
@@ -268,6 +269,12 @@ function normalizedEligibilityLabel(org) {
   if (org.eligibilityFlag === 'above_revenue_band') {
     return 'Above BGT Revenue Band (5M maximum)'
   }
+  if (org.eligibilityFlag === 'missing_mission_review') {
+    return 'Missing Mission Review'
+  }
+  if (org.eligibilityFlag === 'upstream_data_gap') {
+    return org.eligibilityFlagLabel || 'Upstream Data Gap'
+  }
   return org.eligibilityFlagLabel || null
 }
 
@@ -451,6 +458,15 @@ function ConfidencePill({ band }) {
 }
 
 function MatchScoreBox({ score }) {
+  if (score == null) {
+    return (
+      <div className="w-full rounded-[1.1rem] border border-forest/10 bg-forest/6 px-4 py-3 text-forest">
+        <p className="text-[0.65rem] uppercase tracking-[0.18em] text-forest/52">Match score</p>
+        <p className="mt-2 font-cta text-xl leading-tight">Unavailable</p>
+        <p className="mt-2 text-xs leading-5 text-forest/62">Data gap requires reviewer re-check.</p>
+      </div>
+    )
+  }
   const normalized = clampScore(score) ?? 0
   return (
     <div className="w-full rounded-[1.1rem] bg-forest px-4 py-3 text-cream">
@@ -513,7 +529,11 @@ function EligibilityBanner({ org }) {
   const label = normalizedEligibilityLabel(org)
   if (!label) return null
   const classes =
-    org.eligibilityFlag === 'above_revenue_band'
+    org.eligibilityFlag === 'missing_mission_review'
+      ? 'border-l-[5px] border-sky bg-sky/12 text-forest'
+      : org.eligibilityFlag === 'upstream_data_gap'
+      ? 'border-l-[5px] border-ember bg-ember/10 text-forest'
+      : org.eligibilityFlag === 'above_revenue_band'
       ? 'border-l-[5px] border-[#8970d9] bg-[#8970d9]/8 text-forest'
       : 'border-l-[5px] border-sun bg-sun/14 text-forest'
   return (
@@ -840,6 +860,7 @@ export default function DiscoveryPage() {
   })
   const [orgs, setOrgs] = useState([])
   const [manualOrgs, setManualOrgs] = useState([])
+  const [excludedOrgs, setExcludedOrgs] = useState([])
   const [savedShortlist, setSavedShortlist] = useState([])
   const [notes, setNotes] = useState({})
   const [selectedOrg, setSelectedOrg] = useState(null)
@@ -867,21 +888,31 @@ export default function DiscoveryPage() {
     params.set('maturityTier', filters.maturityTier)
     params.set('minMissionAlignment', String(filters.minMissionAlignment))
     params.set('confidenceBand', filters.confidenceBand)
-    params.set('programFocus', filters.programFocus.join(','))
-    params.set('websiteMissionMatch', filters.websiteMissionMatch.join(','))
+    if (filters.programFocus.length !== PROGRAM_FOCUS_OPTIONS.length) {
+      params.set('programFocus', filters.programFocus.join(','))
+    }
+    if (filters.websiteMissionMatch.length !== WEBSITE_MATCH_OPTIONS.length) {
+      params.set('websiteMissionMatch', filters.websiteMissionMatch.join(','))
+    }
     return params.toString()
   }, [filters])
 
   useEffect(() => {
     const loadOrgs = async () => {
       try {
-        const [mainRes, manualRes] = await Promise.all([
+        const [mainRes, manualRes, excludedRes] = await Promise.all([
           fetch(`/api/orgs?${filterParams}`),
           fetch(`/api/orgs/manual?${filterParams}`),
+          fetch(`/api/orgs/excluded?${filterParams}`),
         ])
-        const [mainData, manualData] = await Promise.all([mainRes.json(), manualRes.json()])
+        const [mainData, manualData, excludedData] = await Promise.all([
+          mainRes.json(),
+          manualRes.json(),
+          excludedRes.json(),
+        ])
         setOrgs(Array.isArray(mainData) ? mainData : [])
         setManualOrgs(Array.isArray(manualData) ? manualData : [])
+        setExcludedOrgs(Array.isArray(excludedData) ? excludedData : [])
       } catch (error) {
         console.error('Fetch org dataset error:', error)
       }
@@ -928,6 +959,16 @@ export default function DiscoveryPage() {
       })
   }, [manualOrgs, weights])
 
+  const scoredExcludedOrgs = useMemo(() => {
+    return excludedOrgs
+      .map((org) => ({ ...org, computedOverallScore: computeOverallScore(org, weights) }))
+      .sort((a, b) => {
+        const flagDelta = String(a.eligibilityFlagLabel || '').localeCompare(String(b.eligibilityFlagLabel || ''))
+        if (flagDelta) return flagDelta
+        return String(a.name || '').localeCompare(String(b.name || ''))
+      })
+  }, [excludedOrgs, weights])
+
   const shortlistedEins = useMemo(
     () => new Set(savedShortlist.map((item) => item.org_ein || item.ein).filter(Boolean)),
     [savedShortlist]
@@ -948,13 +989,13 @@ export default function DiscoveryPage() {
     return {
       count: topMatches.length,
       avgScore,
-      topSector: DEFAULT_SECTOR,
+      topSector: DATASET_PRIMARY_SECTOR,
       topMatch,
     }
   }, [topMatches, topMatch])
 
   const shortlistCards = useMemo(() => {
-    const byEin = new Map([...scoredOrgs, ...scoredManualOrgs].map((org) => [org.ein, org]))
+    const byEin = new Map([...scoredOrgs, ...scoredManualOrgs, ...scoredExcludedOrgs].map((org) => [org.ein, org]))
     return savedShortlist
       .map((saved) => {
         const ein = saved.org_ein || saved.ein
@@ -962,16 +1003,16 @@ export default function DiscoveryPage() {
         return match ? { ...match, approval_id: saved.approval_id, org_ein: ein } : null
       })
       .filter(Boolean)
-  }, [savedShortlist, scoredManualOrgs, scoredOrgs])
+  }, [savedShortlist, scoredExcludedOrgs, scoredManualOrgs, scoredOrgs])
 
   const stateOptions = useMemo(() => {
-    const allStates = [...scoredOrgs, ...scoredManualOrgs]
+    const allStates = [...scoredOrgs, ...scoredManualOrgs, ...scoredExcludedOrgs]
       .map((org) => org.state)
       .filter(Boolean)
     return Array.from(new Set(allStates))
       .sort()
       .map((code) => ({ value: code, label: STATE_NAMES[code] || code }))
-  }, [scoredManualOrgs, scoredOrgs])
+  }, [scoredExcludedOrgs, scoredManualOrgs, scoredOrgs])
 
   const filtersActive =
     filters.state !== 'ALL' ||
@@ -1132,7 +1173,7 @@ export default function DiscoveryPage() {
         <div className="relative z-10 mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <HeroStat icon={<Target className="h-4 w-4" />} label="Matches" value={topMatches.length} accent="sun" />
           <HeroStat icon={<Gauge className="h-4 w-4" />} label="Avg score" value={matchStats ? `${matchStats.avgScore}` : '—'} sub={matchStats ? 'out of 100' : null} />
-          <HeroStat icon={<Layers className="h-4 w-4" />} label="Top sector" value={DEFAULT_SECTOR} sub={topMatches.length ? `${topMatches.length} orgs` : null} />
+          <HeroStat icon={<Layers className="h-4 w-4" />} label="Top sector" value={matchStats?.topSector || DATASET_PRIMARY_SECTOR} sub={topMatches.length ? `${topMatches.length} orgs` : null} />
           <HeroStat icon={<Sparkles className="h-4 w-4" />} label="Top match" value={topMatch?.name || 'None'} sub={topMatch ? `Score ${topMatch.computedOverallScore}` : null} />
         </div>
 
@@ -1370,6 +1411,9 @@ export default function DiscoveryPage() {
                 <TabButton active={activeTab === 'manualReview'} count={scoredManualOrgs.length} onClick={() => setActiveTab('manualReview')}>
                   Manual Review
                 </TabButton>
+                <TabButton active={activeTab === 'dataGaps'} count={scoredExcludedOrgs.length} onClick={() => setActiveTab('dataGaps')}>
+                  Data Gaps
+                </TabButton>
               </div>
             </div>
 
@@ -1415,9 +1459,9 @@ export default function DiscoveryPage() {
               {activeTab === 'manualReview' ? (
                 <div className="space-y-4">
                   <div className="rounded-[1.5rem] border border-sun/24 bg-sun/12 px-5 py-5 text-forest">
-                    <p className="font-cta text-lg">Outside BGT Eligibility Band</p>
+                    <p className="font-cta text-lg">Needs Manual Review Before Outreach</p>
                     <p className="mt-2 text-sm leading-6 text-forest/76">
-                      These organizations fall outside BGT&apos;s revenue criteria ($500K-$5M) for Phase 1 outreach. They appear here because qualitative mission and program data is available. Capacity scores are shown for context only.
+                      These organizations are not in the standard Top Matches pool because they either fall outside BGT&apos;s Phase 1 revenue band ($500K-$5M) or have missing mission-review fields. Capacity scores are shown for context only; reviewers should confirm fit before moving them into outreach.
                     </p>
                   </div>
                   {scoredManualOrgs.map((org) => (
@@ -1430,6 +1474,45 @@ export default function DiscoveryPage() {
                         onOpen={(item) => openOrg(item)}
                         onToggleShortlist={handleToggleShortlist}
                         helperText="Manual Review cards are sorted by mission alignment first. Score is shown for reference only."
+                        actionLabel={shortlistedEins.has(org.ein) ? 'Remove from Shortlist' : 'Save to Shortlist'}
+                      />
+                      {selectedOrg?.ein === org.ein ? (
+                        <SelectedOrgPanel
+                          selectedOrg={selectedOrg}
+                          shortlistedEins={shortlistedEins}
+                          revealedExplanation={revealedExplanation}
+                          loadingPanel={loadingPanel}
+                          handleGenerateExplanation={handleGenerateExplanation}
+                          handleToggleShortlist={handleToggleShortlist}
+                          setSelectedOrg={setSelectedOrg}
+                          notes={notes}
+                          setNotes={setNotes}
+                          saveNote={saveNote}
+                        />
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+
+              {activeTab === 'dataGaps' ? (
+                <div className="space-y-4">
+                  <div className="rounded-[1.5rem] border border-ember/18 bg-ember/8 px-5 py-5 text-forest">
+                    <p className="font-cta text-lg">Upstream Data Gaps</p>
+                    <p className="mt-2 text-sm leading-6 text-forest/76">
+                      These organizations were excluded upstream because a recent full 990 or NCCS coverage was unavailable. They stay visible here so reviewers can re-examine them if better filings, NCCS data, or source evidence becomes available.
+                    </p>
+                  </div>
+                  {scoredExcludedOrgs.map((org) => (
+                    <div key={org.ein}>
+                      <EligibilityBanner org={org} />
+                      <TopMatchCard
+                        org={org}
+                        score={null}
+                        saved={shortlistedEins.has(org.ein)}
+                        onOpen={(item) => openOrg(item)}
+                        onToggleShortlist={handleToggleShortlist}
+                        helperText="Data Gap cards are preserved for auditability and are not part of Top Matches or Manual Review."
                         actionLabel={shortlistedEins.has(org.ein) ? 'Remove from Shortlist' : 'Save to Shortlist'}
                       />
                       {selectedOrg?.ein === org.ein ? (

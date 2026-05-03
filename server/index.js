@@ -39,7 +39,8 @@ app.use(express.json({ limit: '1mb' }))
 app.use(express.static(path.join(__dirname, '../dist')))
 
 const CONFIDENCE_ORDER = { HIGH: 3, MEDIUM: 2, LOW: 1 }
-const DEFAULT_SECTOR = 'Water Systems & Marine & Coastal Ecosystems'
+const DEFAULT_FILTER_SECTOR = 'All sectors'
+const FALLBACK_SECTOR = 'Water Systems & Marine & Coastal Ecosystems'
 
 function parseMulti(value) {
   if (!value) return []
@@ -67,17 +68,19 @@ function geographicReachScore(scope) {
 }
 
 function formatOrg(row) {
-  const financialStability = row.scoreFinancialStability
-  const revenueHealth = row.scoreRevenueHealth
-  const operationalEfficiency = row.scoreOperationalEfficiency
-  const organizationalMaturity = row.scoreOrganizationalMaturity
+  const hasUpstreamDataGap = row.eligibilityFlag === 'upstream_data_gap'
+  const financialStability = hasUpstreamDataGap ? null : row.scoreFinancialStability
+  const revenueHealth = hasUpstreamDataGap ? null : row.scoreRevenueHealth
+  const operationalEfficiency = hasUpstreamDataGap ? null : row.scoreOperationalEfficiency
+  const organizationalMaturity = hasUpstreamDataGap ? null : row.scoreOrganizationalMaturity
+  const overallScore = hasUpstreamDataGap ? null : row.scoreOverall
   const missionAlignmentScore = row.missionAlignmentScore
 
   return {
     ...row,
     id: row.ein,
     inScope: Boolean(row.inScope),
-    sector: row.sector || DEFAULT_SECTOR,
+    sector: row.sector || FALLBACK_SECTOR,
     maturity: row.maturityTier,
     mission: row.missionSummary || row.missionStatement,
     location: row.state || null,
@@ -86,7 +89,7 @@ function formatOrg(row) {
     revenue_growth: revenueHealth != null ? revenueHealth / 100 : null,
     sustainability: financialStability != null ? financialStability / 100 : null,
     scale: organizationalMaturity != null ? organizationalMaturity / 100 : null,
-    grant_distribution: row.scoreOverall != null ? row.scoreOverall / 100 : null,
+    grant_distribution: overallScore != null ? overallScore / 100 : null,
     geographic_reach: geographicReachScore(row.geographicScope),
     innovation_output: missionAlignmentScore != null ? missionAlignmentScore / 5 : null,
     riskSignals: parseRiskSignals(row.riskSignals),
@@ -109,7 +112,7 @@ function formatOrg(row) {
       latestEmployees: row.latestEmployees,
     },
     scores: {
-      overallScore: row.scoreOverall,
+      overallScore,
       financialStability: {
         score: financialStability,
         color: row.colorFinancialStability,
@@ -133,14 +136,14 @@ function formatOrg(row) {
 function applyOrgFilters(rows, query, options = {}) {
   const {
     ignoreMinScore = false,
-    defaultSector = DEFAULT_SECTOR,
+    defaultSector = DEFAULT_FILTER_SECTOR,
   } = options
 
   const state = query.state ? String(query.state).trim() : null
   const maturityTier = query.maturityTier ? String(query.maturityTier).trim() : null
   const confidenceBand = query.confidenceBand ? String(query.confidenceBand).trim() : 'ALL'
   const sector = query.sector ? String(query.sector).trim() : defaultSector
-  const minMissionAlignment = Number(query.minMissionAlignment || 1)
+  const minMissionAlignment = Number(query.minMissionAlignment ?? 0)
   const minScore = Number(query.minScore || 0)
   const programFocus = parseMulti(query.programFocus)
   const websiteMissionMatch = parseMulti(query.websiteMissionMatch)
@@ -182,9 +185,31 @@ function sortManualOrgs(rows) {
   })
 }
 
+function sortExcludedOrgs(rows) {
+  return [...rows].sort((a, b) => {
+    const flagDelta = String(a.eligibilityFlagLabel || '').localeCompare(String(b.eligibilityFlagLabel || ''))
+    if (flagDelta) return flagDelta
+    return String(a.name || '').localeCompare(String(b.name || ''))
+  })
+}
+
 function getOrgRows(inScope) {
   const db = getDb()
   return db.prepare('SELECT * FROM organizations WHERE inScope = ?').all(inScope ? 1 : 0)
+}
+
+function getManualReviewRows() {
+  const db = getDb()
+  return db
+    .prepare("SELECT * FROM organizations WHERE inScope = 0 AND eligibilityFlag != 'upstream_data_gap'")
+    .all()
+}
+
+function getExcludedRows() {
+  const db = getDb()
+  return db
+    .prepare("SELECT * FROM organizations WHERE inScope = 0 AND eligibilityFlag = 'upstream_data_gap'")
+    .all()
 }
 
 function getAllStateCounts() {
@@ -212,12 +237,27 @@ app.get('/api/orgs', (req, res) => {
 
 app.get('/api/orgs/manual', (req, res) => {
   try {
-    const rows = getOrgRows(false)
-    const filtered = sortManualOrgs(applyOrgFilters(rows, req.query, { ignoreMinScore: true })).map(formatOrg)
+    const rows = getManualReviewRows()
+    const filtered = sortManualOrgs(
+      applyOrgFilters(rows, { ...req.query, minMissionAlignment: 0 }, { ignoreMinScore: true })
+    ).map(formatOrg)
     res.json(filtered)
   } catch (err) {
     console.error('Fetch manual orgs error:', err)
     res.status(500).json({ error: 'Failed to fetch manual review organizations.' })
+  }
+})
+
+app.get('/api/orgs/excluded', (req, res) => {
+  try {
+    const rows = getExcludedRows()
+    const filtered = sortExcludedOrgs(
+      applyOrgFilters(rows, { ...req.query, minMissionAlignment: 0 }, { ignoreMinScore: true })
+    ).map(formatOrg)
+    res.json(filtered)
+  } catch (err) {
+    console.error('Fetch excluded orgs error:', err)
+    res.status(500).json({ error: 'Failed to fetch excluded organizations.' })
   }
 })
 
@@ -234,7 +274,7 @@ app.get('/api/orgs/stats', (req, res) => {
       count,
       avgScore,
       topSector: {
-        name: DEFAULT_SECTOR,
+        name: FALLBACK_SECTOR,
         count,
       },
       topMatch: topMatch
@@ -360,7 +400,7 @@ app.post('/api/approve', (req, res) => {
   try {
     db.prepare(
       'INSERT INTO approved_organizations (id, nonprofit_id, org_ein, name, sector) VALUES (?, ?, ?, ?, ?)'
-    ).run(id, nonprofit_id || null, org_ein || null, name || null, sector || DEFAULT_SECTOR)
+    ).run(id, nonprofit_id || null, org_ein || null, name || null, sector || FALLBACK_SECTOR)
     res.json({ success: true, id })
   } catch (err) {
     console.error('Insert error:', err)
@@ -395,7 +435,7 @@ app.get('/api/approved', (req, res) => {
             : {
                 ein: row.org_ein,
                 name: row.approved_name,
-                sector: row.approved_sector || DEFAULT_SECTOR,
+                sector: row.approved_sector || FALLBACK_SECTOR,
               }
           return {
             ...formatted,

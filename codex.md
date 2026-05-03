@@ -181,6 +181,7 @@ Key files:
 - `server/db.js`: SQLite connection, schema execution, lightweight migrations, indexes.
 - `server/schema.sql`: tables for legacy attempts/nonprofits plus current organizations and approvals.
 - `server/seed.js`: seeds organizations from JSON only when the organizations table is empty.
+- `server/capacityScoring.js`: recalculates the four BGT capacity category scores from raw 990 metrics using maturity-tier thresholds ported from `pull_990_data.py`.
 - `server/bgt_orgs_data_v2.json`: current source dataset.
 - `server/big_green_tent.db`: generated local SQLite database.
 - `server/scoring.js`: legacy seven-metric scoring helper; current Discovery page computes four-score capacity weighting in the frontend.
@@ -289,7 +290,7 @@ Main sections:
 - Next-step cards for explaining the top match, reviewing the shortlist, and tuning/resetting the lens.
 - Geography map for state-level review.
 - Filter panel.
-- Discovery tabs for Top Matches, Saved Shortlist, and Manual Review.
+- Discovery tabs for Top Matches, Saved Shortlist, Manual Review, and Data Gaps.
 - Inline selected organization detail panel.
 
 Hero next-step behavior:
@@ -302,7 +303,7 @@ Important recent behavior:
 
 - `Review details` expands the selected card inline where the card appears.
 - It should not jump the reviewer to the bottom of the page.
-- The selected details panel appears below the active card in both Top Matches and Manual Review.
+- The selected details panel appears below the active card in Top Matches, Manual Review, and Data Gaps.
 
 ## Discovery Filters
 
@@ -462,15 +463,27 @@ Saved Shortlist tab:
 
 ## Manual Review
 
-Manual Review shows organizations outside BGT's Phase 1 revenue criteria but still worth contextual visibility.
+Manual Review shows organizations outside BGT's standard Top Matches pool but still worth contextual visibility.
 
 Manual Review rules:
 
-- These organizations are outside the `$500K-$5M` BGT revenue band.
-- They appear because mission and qualitative program data exists.
+- These organizations are either below the `$500K` BGT revenue floor or missing mission-review fields.
+- They are distinct from upstream data gaps.
 - Capacity scores are shown for context only.
 - Manual Review sorts by mission alignment first, then data confidence.
 - Minimum Score Threshold does not filter Manual Review.
+
+Data Gaps:
+
+- The prototype now keeps all 217 fixed Excel rows visible in the backend/UI.
+- Top Matches: 202.
+- Manual Review: 6.
+- Data Gaps: 9.
+- Data Gaps are upstream exclusions, not candidate recommendations.
+- Five are flagged `Missing Full 990 Filing`.
+- Four are flagged `No NCCS Coverage`.
+- Data Gaps use `/api/orgs/excluded` and the `excludedOrgs` group in `server/bgt_orgs_data_v2.json`.
+- They remain visible so reviewers can re-examine them if better filings, NCCS coverage, or source evidence becomes available.
 
 Eligibility label normalization is intentional because the client needs plain language:
 
@@ -609,7 +622,11 @@ README drift:
 Legacy scoring:
 
 - `server/scoring.js` still contains old seven-metric scoring logic.
-- Discovery currently computes four-category weighted scores in the frontend.
+- `server/capacityScoring.js` is the current backend capacity scoring path.
+- During seeding, `server/seed.js` ignores the static JSON score objects and recalculates Financial Stability, Revenue Health, Operational Efficiency, Organizational Maturity, and overall score from raw metrics.
+- The recalculation uses Emerging, Established, and Mature thresholds from the provided `pull_990_data.py`.
+- Discovery still computes the live user-weighted match score in the frontend from those four backend-provided category scores.
+- Mission review fields remain separate from capacity scoring; an org can have strong 990 capacity scores while still being sent to Manual Review for missing mission-review data.
 
 Legacy data-pipeline folder:
 
@@ -703,4 +720,3 @@ Manual browser checks:
 - Add tests for shortlist add/remove and filter query generation.
 - Add an admin-only reseed command or endpoint for demo maintenance.
 - Update `README.md` so it matches the current C32 dataset and BGT reviewer workflow.
-
